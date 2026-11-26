@@ -1,0 +1,25 @@
+// moss.msh -- the Moss standard module.
+// It is written in Moss itself: everything here is built on the native
+// capabilities exposed by the built-in `core` module.
+moss 1000;
+
+pick head {
+  core: @print_int, @print_bool, @print_str;
+}
+
+cap output(int x): void {
+  print_int(x);
+}
+
+cap output(bool b): void {
+  print_bool(b);
+}
+
+cap output(string s): void {
+  print_str(s);
+}
+
+cap pair(int a, int b): void {
+  print_int(a);
+  print_int(b);
+}

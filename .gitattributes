@@ -1,0 +1,5 @@
+# Keep the repository text files LF, regardless of the platform.
+* text=auto eol=lf
+
+# Windows batch files keep CRLF.
+*.bat text eol=crlf

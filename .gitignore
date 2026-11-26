@@ -1,0 +1,15 @@
+# build artifacts
+*.exe
+*.o
+*.obj
+*.mbc
+*.c.tmp
+
+# generated C kept by --emit-c
+out.c
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
