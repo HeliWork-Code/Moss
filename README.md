@@ -50,6 +50,8 @@ Requirements:
 - a C++17 compiler (`g++` or `clang++`) to build the compiler itself
 - `gcc` on `PATH` (or `MOSS_CC` set) only if you want native executables
 
+See [BUILDING.md](BUILDING.md) for a detailed, platform-by-platform guide.
+
 ```bash
 bash build.sh                 # builds moss.exe and mossrt.exe
 
