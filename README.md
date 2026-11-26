@@ -1,5 +1,7 @@
 # Moss
 
+[![CI](https://github.com/HeliWork-Code/Moss/actions/workflows/ci.yml/badge.svg)](https://github.com/HeliWork-Code/Moss/actions/workflows/ci.yml)
+
 > a little lang,not so hard.enjoy this =).
 
 A small, statically typed language built around **capabilities**: nothing is
