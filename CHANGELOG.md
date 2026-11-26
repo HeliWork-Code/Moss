@@ -23,6 +23,8 @@ Versions are `[year].[major].[pre-release]`:
   unbounded), `a[1~]` (starts at 1, unbounded), `a[~10]` (empty, at most 10).
 - `len`, `grow` and `shrink` as core capabilities, with one overload set per
   element type (`int`, `bool`, `string`).
+- `const` bindings: `const int n = 1;` must be initialized and cannot be
+  assigned; `mut` parameters also reject constants.
 - Methods declared inside `struct` bodies: fields are in scope directly and
   the receiver is the implicit `self` parameter.
 - `for x in a` over arrays and `for i in a~b` over integer ranges.

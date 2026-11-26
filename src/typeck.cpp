@@ -6,6 +6,7 @@ namespace {
 
 struct VarInfo {
   Type type;
+  bool mutable_ = true;
 };
 
 class Checker {
@@ -38,11 +39,12 @@ class Checker {
     return s;
   }
 
-  void declare(int line, const std::string& name, Type type) {
+  void declare(int line, const std::string& name, Type type,
+               bool mutable_ = true) {
     auto& scope = scopes.back();
     if (scope.count(name))
       error(line, "variable '" + name + "' is already declared in this scope");
-    scope[name] = VarInfo{type};
+    scope[name] = VarInfo{type, mutable_};
   }
 
   const VarInfo* findVar(const std::string& name) const {
@@ -119,12 +121,18 @@ class Checker {
                                 "' is declared as " + typeName(d.type) +
                                 " but initialized with " + typeName(t));
           }
-          declare(d.line, d.name, d.type);
+          declare(d.line, d.name, d.type, !d.isConst);
         }
         break;
 
       case Stmt::Kind::Assign: {
         Type targetType = checkLValue(*s.target);
+        if (s.target->kind == Expr::Kind::Var) {
+          const VarInfo& v = lookup(s.line, s.target->name);
+          if (!v.mutable_)
+            error(s.line,
+                  "cannot assign to constant '" + s.target->name + "'");
+        }
         Type t = checkExpr(*s.expr);
         if (t == TypeKind::Void) error(s.line, "cannot assign a void expression");
         if (t != targetType)
@@ -466,6 +474,13 @@ class Checker {
       if (f->params[i].mut && arg->kind != Expr::Kind::Var)
         error(e.line, "argument " + std::to_string(i + 1) + " of '" + e.name +
                           "' must be a variable (the parameter is 'mut')");
+      if (f->params[i].mut && arg->kind == Expr::Kind::Var) {
+        const VarInfo* v = findVar(arg->name);
+        if (v && !v->mutable_)
+          error(e.line, "argument " + std::to_string(i + 1) + " of '" +
+                            e.name + "' must be mutable; '" + arg->name +
+                            "' is a constant");
+      }
     }
     e.resolved = f;
     return f->returnType;

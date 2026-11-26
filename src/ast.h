@@ -80,6 +80,7 @@ struct DeclItem {
   std::string name;
   Type type;       // full type; for arrays this is Array(element)
   ExprPtr init;    // may be null
+  bool isConst = false;  // declared with `const`
   ExprPtr size;    // array length expression, non-null only for arrays
   ExprPtr maxSize; // array capacity limit, non-null for [a~b] / [~b]
   bool growable = false;  // [a~...] forms; false means fixed length

@@ -17,6 +17,7 @@ const char* tokName(Tok k) {
     case Tok::KwFn: return "fn";
     case Tok::KwStruct: return "struct";
     case Tok::KwArray: return "array";
+    case Tok::KwConst: return "const";
     case Tok::KwIf: return "if";
     case Tok::KwElse: return "else";
     case Tok::KwWhile: return "while";
@@ -189,6 +190,7 @@ struct Lexer {
         else if (id == "fn") k = Tok::KwFn;
         else if (id == "struct") k = Tok::KwStruct;
         else if (id == "array") k = Tok::KwArray;
+        else if (id == "const") k = Tok::KwConst;
         else if (id == "if") k = Tok::KwIf;
         else if (id == "else") k = Tok::KwElse;
         else if (id == "while") k = Tok::KwWhile;

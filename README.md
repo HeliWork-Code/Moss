@@ -90,6 +90,9 @@ fn int main() {
   a = 3;
   b = 4;
 
+  // constants must be initialized and cannot be assigned
+  const int limit = 10;
+
   // three loop forms
   for (int i = 1; i <= 3; i = i + 1) {
     show @i;
@@ -210,8 +213,8 @@ examples/                small programs
 
 ## Status and limitations
 
-Works today: `int`, `bool`, `string`, `void`, structs (reference semantics,
-methods with implicit `self`),
+Works today: `int`, `bool`, `string`, `void`, `const` bindings, structs
+(reference semantics, methods with implicit `self`),
 arrays with fixed, runtime or growable lengths plus bounds and capacity
 checks, `len`/`grow`/`shrink`, functions, `if`/`else`, `while`, `for`,
 `for ... in` over ranges and arrays, `__go`, capabilities with `pick`,

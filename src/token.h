@@ -4,6 +4,7 @@
 enum class Tok {
   Eof, IntLit, StrLit, Ident,
   KwPick, KwHead, KwAs, KwCap, KwMut, KwArgs, KwFn, KwStruct, KwArray,
+  KwConst,
   KwIf, KwElse, KwWhile, KwFor, KwWhen, KwIn, KwReturn, KwTrue, KwFalse,
   KwIntType, KwBoolType, KwStringType, KwVoidType,
   At,

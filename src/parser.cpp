@@ -231,6 +231,27 @@ class Parser {
                           std::move(body), start.line);
     }
 
+    if (check(Tok::KwConst)) {
+      advance();
+      if (check(Tok::KwArray))
+        error("const arrays are not implemented yet");
+      Type ty = parseType();
+      std::vector<DeclItem> items;
+      for (;;) {
+        DeclItem d;
+        d.type = ty;
+        d.line = t.line;
+        d.isConst = true;
+        d.name = expect(Tok::Ident, "constant name").text;
+        expect(Tok::Assign, "'=': constants need an initializer");
+        d.init = parseExpr();
+        items.push_back(std::move(d));
+        if (!match(Tok::Comma)) break;
+      }
+      expect(Tok::Semi, "';'");
+      return Stmt::declStmt(std::move(items), t.line);
+    }
+
     if (check(Tok::KwArray)) {
       advance();
       Type elem = parseType();
