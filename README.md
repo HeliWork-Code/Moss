@@ -172,9 +172,6 @@ error handling.
 Generated C leaks strings (no deallocator yet); programs are meant to be
 short-lived.
 
-Files at the repository root (`example.ms`, `pick1.ms`, `for_ex.ms`) are design
-sketches, not valid programs.
-
 ## License
 
 MIT — see [LICENSE](LICENSE). Copyright (c) 2026 HeliWork Studios.
