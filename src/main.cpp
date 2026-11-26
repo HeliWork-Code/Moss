@@ -172,6 +172,14 @@ void packageExecutable(const BytecodeProgram& bc, const std::string& exeDir,
   out.append(kTrailer, 8);
 
   writeFile(outPath, out);
+#ifndef _WIN32
+  // A packaged program is an executable; writeFile only sets read/write bits.
+  std::error_code ec;
+  fs::permissions(outPath,
+                  fs::perms::owner_exec | fs::perms::group_exec |
+                      fs::perms::others_exec,
+                  fs::perm_options::add, ec);
+#endif
 }
 
 std::string findCompiler() {
