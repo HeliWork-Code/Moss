@@ -1,5 +1,7 @@
 # Moss
 
+> a little lang,not so hard.enjoy this =).
+
 A small, statically typed language built around **capabilities**: nothing is
 built in except the ability to `pick` what you need.
 
