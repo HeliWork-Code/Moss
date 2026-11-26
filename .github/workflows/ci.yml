@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y g++
+
+      - name: Build
+        run: MOSS_STATIC=0 bash build.sh
+
+      - name: Test (VM backend)
+        run: bash tests/run.sh
+
+      - name: Test (native backend)
+        run: bash tests/native.sh
+
+      - name: Test (packaging)
+        run: bash tests/packaging.sh
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: mingw-w64-ucrt-x86_64-gcc
+
+      - name: Build
+        run: bash build.sh
+
+      - name: Test (VM backend)
+        run: bash tests/run.sh
+
+      - name: Test (native backend)
+        run: bash tests/native.sh
+
+      - name: Test (packaging)
+        run: bash tests/packaging.sh

@@ -20,9 +20,12 @@ fi
 FLAGS="-std=c++17 -O2 -Wall -Wextra -Isrc"
 
 # Static linking keeps the produced executables free of the toolchain's
-# runtime DLLs on Windows. Drop these flags if your platform does not
-# support them.
-STATIC="-static -static-libgcc -static-libstdc++"
+# runtime DLLs on Windows. Set MOSS_STATIC=0 when the platform has no
+# static libstdc++ (some Linux distributions).
+STATIC=""
+if [ "${MOSS_STATIC:-1}" = "1" ]; then
+  STATIC="-static -static-libgcc -static-libstdc++"
+fi
 
 "$CXX" $FLAGS $STATIC -o moss.exe src/*.cpp
 "$CXX" $FLAGS $STATIC -o mossrt.exe \

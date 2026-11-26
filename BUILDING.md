@@ -73,7 +73,7 @@ bash build.sh
 ```
 
 `build.sh` passes `-static`; if your distribution does not provide static
-libstdc++, build manually (see below).
+libstdc++, run `MOSS_STATIC=0 bash build.sh` (or build manually, below).
 
 ### macOS
 
@@ -83,7 +83,13 @@ bash build.sh
 ```
 
 The `-static` flags in `build.sh` are not supported by the macOS toolchain.
-Build manually instead:
+Disable them:
+
+```bash
+MOSS_STATIC=0 bash build.sh
+```
+
+or build manually:
 
 ```bash
 g++ -std=c++17 -O2 -Isrc -o moss.exe src/*.cpp
@@ -125,6 +131,7 @@ echo "1 3 5" | ./moss.exe examples/sum.ms      # prints 9
 | `MOSS_MINGW` | `build.sh`, test scripts, `mossbuild.sh` | directory containing `gcc`/`g++`, prepended to `PATH` |
 | `MOSS_CC` | `moss build`, `mossbuild.*` | C compiler for native builds (default: `gcc` on `PATH`) |
 | `MOSS_BACKEND` | `tests/run.sh` | `vm` (default) or `native` |
+| `MOSS_STATIC` | `build.sh` | `0` disables static linking (needed on distributions without static libstdc++) |
 
 When `MOSS_CC` is a full path, `moss` adds its directory to the child
 process `PATH` automatically, so the compiler's helper processes can find
@@ -177,4 +184,4 @@ is a bug.
 | `standalone runtime 'mossrt.exe' not found next to moss` | `moss pack` cannot find `mossrt.exe` | build it with `build.sh`, or put it next to `moss.exe` |
 | `cannot find module 'moss.msh'` | `lib/` is missing next to the binary | keep `lib/moss.msh` next to `moss.exe` when distributing |
 | A path with spaces fails to compile | unquoted path | quote it: `mossbuild.bat "C:\My Programs\a.ms"` |
-| `-static` link errors (Linux/macOS) | no static libstdc++ | build manually without the `-static` flags |
+| `-static` link errors (Linux/macOS) | no static libstdc++ | `MOSS_STATIC=0 bash build.sh`, or build manually without the flags |
