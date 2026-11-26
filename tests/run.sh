@@ -26,13 +26,17 @@ for f in "$ROOT"/tests/*.ms; do
   name="$(basename "$f" .ms)"
   out="$TMP/out.txt"
   err="$TMP/err.txt"
+  extra=()
+  if [ -f "$ROOT/tests/$name.args" ]; then
+    read -r -a extra < "$ROOT/tests/$name.args"
+  fi
 
   if [[ "$name" == err_* ]]; then
     if [ "$BACKEND" = native ]; then
       "$MOSS" build "$f" -o "$TMP/errprog.exe" > "$out" 2> "$err"
       rc=$?
     else
-      "$MOSS" "$f" > "$out" 2> "$err"
+      "$MOSS" "$f" ${extra[@]+"${extra[@]}"} > "$out" 2> "$err"
       rc=$?
     fi
     if [ "$rc" -ne 0 ] && grep -q "error" "$err"; then
@@ -53,16 +57,16 @@ for f in "$ROOT"/tests/*.ms; do
       continue
     fi
     if [ -f "$ROOT/tests/$name.in" ]; then
-      "$TMP/prog.exe" < "$ROOT/tests/$name.in" > "$out" 2> "$err"
+      "$TMP/prog.exe" ${extra[@]+"${extra[@]}"} < "$ROOT/tests/$name.in" > "$out" 2> "$err"
     else
-      "$TMP/prog.exe" > "$out" 2> "$err"
+      "$TMP/prog.exe" ${extra[@]+"${extra[@]}"} > "$out" 2> "$err"
     fi
     rc=$?
   else
     if [ -f "$ROOT/tests/$name.in" ]; then
-      "$MOSS" "$f" < "$ROOT/tests/$name.in" > "$out" 2> "$err"
+      "$MOSS" "$f" ${extra[@]+"${extra[@]}"} < "$ROOT/tests/$name.in" > "$out" 2> "$err"
     else
-      "$MOSS" "$f" > "$out" 2> "$err"
+      "$MOSS" "$f" ${extra[@]+"${extra[@]}"} > "$out" 2> "$err"
     fi
     rc=$?
   fi

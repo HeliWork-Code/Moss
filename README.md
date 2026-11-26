@@ -127,6 +127,15 @@ bash tests/native.sh                   # native backend
 bash tests/packaging.sh                # bytecode + packaged executables
 ```
 
+`main` may take the command line as one string; `args` is an optional marker:
+
+```moss
+fn int main(args string argv) {
+  show @argv;      // "one two" when run as: prog.exe one two
+  return 0;
+}
+```
+
 ## Project layout
 
 ```

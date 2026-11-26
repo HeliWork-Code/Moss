@@ -120,10 +120,14 @@ int VM::run() {
           throw RuntimeError("call to bad function index");
         const BytecodeFn& callee = prog.functions[(size_t)in.operand];
         std::vector<Value> locals((size_t)callee.num_locals);
-        for (int k = callee.num_params - 1; k >= 0; --k)
+        // main's string parameter is supplied by the runtime, not by the
+        // caller, so there is nothing on the stack to pop for it.
+        bool injectArgs =
+            (int)in.operand == prog.mainIndex && callee.num_params == 1;
+        int toPop = injectArgs ? 0 : callee.num_params;
+        for (int k = toPop - 1; k >= 0; --k)
           locals[(size_t)k] = pop();
-        if ((int)in.operand == prog.mainIndex && callee.num_params == 1)
-          locals[0] = Value::str(mainArgs);
+        if (injectArgs) locals[0] = Value::str(mainArgs);
         frames.push_back(Frame{(int)in.operand, 0, std::move(locals)});
         break;
       }
