@@ -65,6 +65,14 @@ echo "1 3 5" | ./moss.exe examples/sum.ms
 ./moss.exe pack examples/sum.ms -o sum.exe    # embedded-VM executable
 ```
 
+## Documentation
+
+- [Tutorial](docs/tutorial.md) — start here
+- [Language reference](docs/language.md) — types, statements, modules
+- [Standard library](docs/stdlib.md) — every capability `core` and `moss` provide
+- [Building](BUILDING.md) — toolchain requirements, native builds
+- [Changelog](CHANGELOG.md)
+
 ## Language tour
 
 ```moss
