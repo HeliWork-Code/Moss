@@ -38,8 +38,7 @@ Versions are `[year].[major].[pre-release]`:
 
 ## [26.0.1] — 2026-11-26
 
-First pre-release, towards `26.1.0`. The GitHub release was published under
-the tag `26.0.0`; later releases follow the versioning scheme above.
+First pre-release towards `26.1.0`; supersedes the initial `26.0.0` upload.
 
 ### Added
 
