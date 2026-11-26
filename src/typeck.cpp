@@ -63,7 +63,16 @@ class Checker {
     error(line, "use of undeclared variable '" + name + "'");
   }
 
+  void checkArrayElem(Type t, int line) {
+    if (t.kind != TypeKind::Array) return;
+    TypeKind ek = t.elem ? t.elem->kind : TypeKind::Error;
+    if (ek != TypeKind::Int && ek != TypeKind::Bool && ek != TypeKind::Str)
+      error(line, "array elements must be int, bool or string");
+  }
+
   void checkFunction(const FuncDecl& f) {
+    checkArrayElem(f.returnType, f.line);
+    for (const Param& p : f.params) checkArrayElem(p.type, f.line);
     scopes.clear();
     scopes.emplace_back();
     currentScope = f.scope;
@@ -99,6 +108,7 @@ class Checker {
     switch (s.kind) {
       case Stmt::Kind::Decl:
         for (const DeclItem& d : s.decls) {
+          checkArrayElem(d.type, d.line);
           if (d.size) {
             Type st = checkExpr(*d.size);
             if (st != TypeKind::Int)
