@@ -16,6 +16,9 @@ enum NativeId {
   NativeAskInt,
   NativeAskStr,
   NativeAskBool,
+  NativeLen,
+  NativeGrow,
+  NativeShrink,
 };
 
 struct LoadError : std::runtime_error {

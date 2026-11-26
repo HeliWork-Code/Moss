@@ -2,6 +2,12 @@
 #include <cstdio>
 #include <iostream>
 
+static Value defaultArrayValue(int tag) {
+  if (tag == 1) return Value::bool_(false);
+  if (tag == 2) return Value::str("");
+  return Value::int_(0);
+}
+
 VM::VM(const BytecodeProgram& prog, std::string mainArgs)
     : prog(prog), mainArgs(std::move(mainArgs)) {}
 
@@ -243,42 +249,82 @@ int VM::run() {
       }
 
       case Op::NewArray: {
+        int64_t maxLen = pop().i;
         int64_t n = pop().i;
         if (n < 0) throw RuntimeError("negative array length");
-        Value init = in.operand == 1 ? Value::bool_(false)
-                      : in.operand == 2 ? Value::str("")
-                                        : Value::int_(0);
-        arrays.emplace_back((size_t)n, init);
+        if (maxLen >= 0 && n > maxLen)
+          throw RuntimeError("initial array length exceeds capacity");
+        ArrObj a;
+        a.maxLen = maxLen;
+        a.elemTag = (int)in.operand;
+        a.elems.assign((size_t)n, defaultArrayValue(a.elemTag));
+        arrays.push_back(std::move(a));
         push(Value::arr((int64_t)arrays.size() - 1));
         break;
       }
 
       case Op::GetIndex: {
         int64_t idx = pop().i;
-        Value a = pop();
-        if (a.tag != Value::Tag::Arr)
+        Value v = pop();
+        if (v.tag != Value::Tag::Arr)
           throw RuntimeError("internal: index on a non-array");
-        auto& elems = arrays[(size_t)a.i];
-        if (idx < 0 || (size_t)idx >= elems.size())
+        ArrObj& a = arrays[(size_t)v.i];
+        if (idx < 0 || (size_t)idx >= a.elems.size())
           throw RuntimeError("array index " + std::to_string(idx) +
                              " out of range (length " +
-                             std::to_string(elems.size()) + ")");
-        push(elems[(size_t)idx]);
+                             std::to_string(a.elems.size()) + ")");
+        push(a.elems[(size_t)idx]);
         break;
       }
 
       case Op::SetIndex: {
-        Value v = pop();
+        Value val = pop();
         int64_t idx = pop().i;
-        Value a = pop();
-        if (a.tag != Value::Tag::Arr)
+        Value v = pop();
+        if (v.tag != Value::Tag::Arr)
           throw RuntimeError("internal: index assignment on a non-array");
-        auto& elems = arrays[(size_t)a.i];
-        if (idx < 0 || (size_t)idx >= elems.size())
+        ArrObj& a = arrays[(size_t)v.i];
+        if (idx < 0 || (size_t)idx >= a.elems.size())
           throw RuntimeError("array index " + std::to_string(idx) +
                              " out of range (length " +
-                             std::to_string(elems.size()) + ")");
-        elems[(size_t)idx] = std::move(v);
+                             std::to_string(a.elems.size()) + ")");
+        a.elems[(size_t)idx] = std::move(val);
+        break;
+      }
+
+      case Op::Len: {
+        Value v = pop();
+        if (v.tag != Value::Tag::Arr)
+          throw RuntimeError("internal: len on a non-array");
+        push(Value::int_((int64_t)arrays[(size_t)v.i].elems.size()));
+        break;
+      }
+
+      case Op::Grow: {
+        int64_t n = pop().i;
+        Value v = pop();
+        if (v.tag != Value::Tag::Arr)
+          throw RuntimeError("internal: grow on a non-array");
+        ArrObj& a = arrays[(size_t)v.i];
+        if (n < 0) throw RuntimeError("negative array growth");
+        int64_t nl = (int64_t)a.elems.size() + n;
+        if (a.maxLen >= 0 && nl > a.maxLen)
+          throw RuntimeError("array capacity exceeded (max " +
+                             std::to_string(a.maxLen) + ")");
+        a.elems.resize((size_t)nl, defaultArrayValue(a.elemTag));
+        break;
+      }
+
+      case Op::Shrink: {
+        int64_t n = pop().i;
+        Value v = pop();
+        if (v.tag != Value::Tag::Arr)
+          throw RuntimeError("internal: shrink on a non-array");
+        ArrObj& a = arrays[(size_t)v.i];
+        if (n < 0) throw RuntimeError("negative array shrink");
+        if ((int64_t)a.elems.size() < n)
+          throw RuntimeError("cannot shrink below zero");
+        a.elems.resize(a.elems.size() - (size_t)n);
         break;
       }
 

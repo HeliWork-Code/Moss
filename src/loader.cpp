@@ -136,6 +136,26 @@ class Loader {
       f->module = "core";
       core.caps.push_back(std::move(f));
     };
+    // len / grow / shrink, one overload set per element type.
+    auto arrCap = [&](const char* name, Type elem, NativeId id, bool withN) {
+      auto f = std::make_unique<FuncDecl>();
+      f->name = name;
+      f->params.push_back(Param{"a", Type::ofArray(elem), false});
+      if (withN) f->params.push_back(Param{"n", TypeKind::Int, false});
+      f->returnType = id == NativeLen ? TypeKind::Int : TypeKind::Void;
+      f->hasBody = false;
+      f->isNative = true;
+      f->nativeId = id;
+      f->module = "core";
+      core.caps.push_back(std::move(f));
+    };
+    for (Type elem : {Type(TypeKind::Int), Type(TypeKind::Bool),
+                      Type(TypeKind::Str)}) {
+      arrCap("len", elem, NativeLen, false);
+      arrCap("grow", elem, NativeGrow, true);
+      arrCap("shrink", elem, NativeShrink, true);
+    }
+
     askCap(TypeKind::Int, false, NativeAskInt);
     askCap(TypeKind::Int, true, NativeAskInt);
     askCap(TypeKind::Str, false, NativeAskStr);

@@ -109,9 +109,44 @@ static void moss_skip_sep(moss_str sep) {
   }
 }
 
-typedef struct { int64_t* data; int64_t len; } moss_arr_int;
-typedef struct { bool* data; int64_t len; } moss_arr_bool;
-typedef struct { moss_str* data; int64_t len; } moss_arr_str;
+#define MOSS_VEC(T, NAME) \
+typedef struct { T* data; int64_t len; int64_t cap; int64_t max; } NAME; \
+static NAME* NAME##_new(int64_t n, int64_t m) { \
+  NAME* a = (NAME*)malloc(sizeof(NAME)); \
+  if (!a) moss_panic("out of memory"); \
+  if (n < 0) moss_panic("negative array length"); \
+  if (m >= 0 && n > m) moss_panic("initial array length exceeds capacity"); \
+  a->len = n; \
+  a->cap = n > 0 ? n : 1; \
+  a->max = m; \
+  a->data = (T*)calloc((size_t)a->cap, sizeof(T)); \
+  if (!a->data) moss_panic("out of memory"); \
+  return a; \
+} \
+static void NAME##_grow(NAME* a, int64_t n) { \
+  if (n < 0) moss_panic("negative array growth"); \
+  int64_t nl = a->len + n; \
+  if (a->max >= 0 && nl > a->max) moss_panic("array capacity exceeded"); \
+  if (nl > a->cap) { \
+    int64_t nc = a->cap * 2; \
+    if (nc < nl) nc = nl; \
+    a->data = (T*)realloc(a->data, (size_t)nc * sizeof(T)); \
+    if (!a->data) moss_panic("out of memory"); \
+    for (int64_t i = a->cap; i < nc; ++i) a->data[i] = (T){0}; \
+    a->cap = nc; \
+  } \
+  a->len = nl; \
+} \
+static void NAME##_shrink(NAME* a, int64_t n) { \
+  if (n < 0) moss_panic("negative array shrink"); \
+  if (n > a->len) moss_panic("cannot shrink below zero"); \
+  a->len -= n; \
+} \
+static int64_t NAME##_len(NAME* a) { return a->len; }
+
+MOSS_VEC(int64_t, moss_arr_int)
+MOSS_VEC(bool, moss_arr_bool)
+MOSS_VEC(moss_str, moss_arr_str)
 
 static int64_t moss_index(int64_t i, int64_t n) {
   if (i < 0 || i >= n) {
@@ -123,51 +158,23 @@ static int64_t moss_index(int64_t i, int64_t n) {
   return i;
 }
 
-static moss_arr_int moss_arr_int_new(int64_t n) {
-  moss_arr_int a;
-  if (n < 0) moss_panic("negative array length");
-  a.len = n;
-  a.data = (int64_t*)calloc((size_t)(n ? n : 1), sizeof(int64_t));
-  if (!a.data) moss_panic("out of memory");
-  return a;
+static int64_t moss_at_int(moss_arr_int* a, int64_t i) {
+  return a->data[moss_index(i, a->len)];
 }
-
-static moss_arr_bool moss_arr_bool_new(int64_t n) {
-  moss_arr_bool a;
-  if (n < 0) moss_panic("negative array length");
-  a.len = n;
-  a.data = (bool*)calloc((size_t)(n ? n : 1), sizeof(bool));
-  if (!a.data) moss_panic("out of memory");
-  return a;
+static void moss_set_int(moss_arr_int* a, int64_t i, int64_t v) {
+  a->data[moss_index(i, a->len)] = v;
 }
-
-static moss_arr_str moss_arr_str_new(int64_t n) {
-  moss_arr_str a;
-  if (n < 0) moss_panic("negative array length");
-  a.len = n;
-  a.data = (moss_str*)calloc((size_t)(n ? n : 1), sizeof(moss_str));
-  if (!a.data) moss_panic("out of memory");
-  return a;
+static bool moss_at_bool(moss_arr_bool* a, int64_t i) {
+  return a->data[moss_index(i, a->len)];
 }
-
-// Accessors keep the array expression evaluated exactly once on the C side.
-static int64_t moss_at_int(moss_arr_int a, int64_t i) {
-  return a.data[moss_index(i, a.len)];
+static void moss_set_bool(moss_arr_bool* a, int64_t i, bool v) {
+  a->data[moss_index(i, a->len)] = v;
 }
-static void moss_set_int(moss_arr_int a, int64_t i, int64_t v) {
-  a.data[moss_index(i, a.len)] = v;
+static moss_str moss_at_str(moss_arr_str* a, int64_t i) {
+  return a->data[moss_index(i, a->len)];
 }
-static bool moss_at_bool(moss_arr_bool a, int64_t i) {
-  return a.data[moss_index(i, a.len)];
-}
-static void moss_set_bool(moss_arr_bool a, int64_t i, bool v) {
-  a.data[moss_index(i, a.len)] = v;
-}
-static moss_str moss_at_str(moss_arr_str a, int64_t i) {
-  return a.data[moss_index(i, a.len)];
-}
-static void moss_set_str(moss_arr_str a, int64_t i, moss_str v) {
-  a.data[moss_index(i, a.len)] = v;
+static void moss_set_str(moss_arr_str* a, int64_t i, moss_str v) {
+  a->data[moss_index(i, a->len)] = v;
 }
 
 static moss_str moss_join_args(int argc, char** argv) {

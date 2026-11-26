@@ -67,6 +67,9 @@ enum class Op : unsigned char {
   NewArray,     // pop a length, push a fresh array (operand = element tag)
   GetIndex,     // pop index and array, push the element
   SetIndex,     // pop value, index and array, store the element
+  Len,          // pop an array, push its length
+  Grow,         // pop n and an array, extend it by n elements
+  Shrink,       // pop n and an array, drop n elements
   Halt,
 };
 

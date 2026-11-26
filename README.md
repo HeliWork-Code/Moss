@@ -111,16 +111,21 @@ fn int main() {
 }
 ```
 
-Arrays are fixed at creation time, default to zero, and are bounds-checked:
+Arrays default to zero and are bounds-checked. A length range makes an array
+growable:
 
 ```moss
-array int a[10];
+array int a[10];        // fixed length 10
+array int b[2~5];       // starts at 2, may grow to 5
+array int c[~];         // empty, unbounded
+array string d[1~];     // starts at 1, unbounded
+
 a[3] = 7;
 show @a[3];
 
-int n;
-n = 4;
-array string names[n];   // length can come from a variable
+grow @b 2;              // now 4 elements
+shrink @b 1;
+show @len(b);           // 3
 ```
 
 ## Two backends
@@ -175,14 +180,15 @@ examples/                small programs
 ## Status and limitations
 
 Works today: `int`, `bool`, `string`, `void`, structs (reference semantics),
-fixed and runtime-sized arrays with bounds checks, functions, `if`/`else`,
-`while`, `for`, `__go`, capabilities with `pick`, aliasing, overloads, `mut`
-parameters, `@` mentions, string concatenation and comparison,
-`ask`/`input`/`show` style I/O.
+arrays with fixed, runtime or growable lengths plus bounds and capacity
+checks, `len`/`grow`/`shrink`, functions, `if`/`else`, `while`, `for`,
+`__go`, capabilities with `pick`, aliasing, overloads, `mut` parameters,
+`@` mentions, string concatenation and comparison, `ask`/`input`/`show`
+style I/O.
 
-Not yet: dynamic array growth, collections (lists, maps), first-class
-functions, enums and pattern matching, generics, methods on structs, struct
-literals, structs in modules, error handling.
+Not yet: collections (lists, maps), first-class functions, enums and pattern
+matching, generics, methods on structs, struct literals, structs in modules,
+error handling, 2D arrays.
 
 Generated C leaks strings (no deallocator yet); programs are meant to be
 short-lived.

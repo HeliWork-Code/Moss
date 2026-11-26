@@ -111,6 +111,12 @@ class CodeGen {
           int slot = declare(d.name);
           if (d.size) {
             genExpr(*d.size);
+            if (d.growable) {
+              if (d.maxSize) genExpr(*d.maxSize);
+              else emit(Op::PushInt, -1);
+            } else {
+              emit(Op::Dup);  // fixed length: maximum == length
+            }
             emit(Op::NewArray, elemTag(*d.type.elem));
           } else if (d.init) {
             genExpr(*d.init);
@@ -350,6 +356,20 @@ class CodeGen {
           emit(Op::ReadInt, lookup(b->name));
           return;
         }
+        case NativeLen:
+          genExpr(*e.args[0]);
+          emit(Op::Len);
+          return;
+        case NativeGrow:
+          genExpr(*e.args[0]);
+          genExpr(*e.args[1]);
+          emit(Op::Grow);
+          return;
+        case NativeShrink:
+          genExpr(*e.args[0]);
+          genExpr(*e.args[1]);
+          emit(Op::Shrink);
+          return;
         case NativeAskInt:
         case NativeAskStr:
         case NativeAskBool: {

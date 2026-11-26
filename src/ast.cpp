@@ -210,6 +210,7 @@ void dumpStmt(const Stmt& s, int ind) {
         pad(ind + 1);
         std::printf("%s: %s\n", d.name.c_str(), typeName(d.type));
         if (d.size) dumpExpr(*d.size, ind + 2);
+        if (d.maxSize) dumpExpr(*d.maxSize, ind + 2);
         if (d.init) dumpExpr(*d.init, ind + 2);
       }
       break;

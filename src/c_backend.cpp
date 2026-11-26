@@ -8,6 +8,12 @@ extern const char* const kRuntimePrelude;
 
 namespace {
 
+std::string arrayBase(Type t) {
+  if (t.elem && t.elem->kind == TypeKind::Bool) return "moss_arr_bool";
+  if (t.elem && t.elem->kind == TypeKind::Str) return "moss_arr_str";
+  return "moss_arr_int";
+}
+
 std::string ctype(Type t) {
   switch (t.kind) {
     case TypeKind::Int: return "int64_t";
@@ -15,10 +21,7 @@ std::string ctype(Type t) {
     case TypeKind::Str: return "moss_str";
     case TypeKind::Void: return "void";
     case TypeKind::Struct: return "S_" + t.sname + "*";
-    case TypeKind::Array:
-      if (t.elem && t.elem->kind == TypeKind::Bool) return "moss_arr_bool";
-      if (t.elem && t.elem->kind == TypeKind::Str) return "moss_arr_str";
-      return "moss_arr_int";
+    case TypeKind::Array: return arrayBase(t) + "*";
     default: return "void";
   }
 }
@@ -31,7 +34,7 @@ std::string zeroValue(Type t) {
     case TypeKind::Struct:
       return "((S_" + t.sname + "*)calloc(1, sizeof(S_" + t.sname + ")))";
     case TypeKind::Array:
-      return ctype(t) + "_new(0)";
+      return arrayBase(t) + "_new(0, 0)";
     default: return "0";
   }
 }
@@ -187,10 +190,18 @@ class CEmitter {
       case Stmt::Kind::Decl:
         for (const DeclItem& d : s.decls) {
           pad();
+          if (d.size) {
+            std::string base = arrayBase(d.type);
+            std::string maxExpr =
+                d.growable
+                    ? (d.maxSize ? expr(*d.maxSize) : std::string("-1"))
+                    : expr(*d.size);
+            out << base << "* " << cvar(d.name) << " = " << base << "_new("
+                << expr(*d.size) << ", " << maxExpr << ");\n";
+            continue;
+          }
           out << ctype(d.type) << " " << cvar(d.name) << " = ";
-          if (d.size)
-            out << ctype(d.type) << "_new(" << expr(*d.size) << ")";
-          else if (d.init) out << expr(*d.init);
+          if (d.init) out << expr(*d.init);
           else out << zeroValue(d.type);
           out << ";\n";
         }
@@ -378,6 +389,14 @@ class CEmitter {
         return "(" + lvalue(*e.args[0]) + " = moss_read_int(), moss_skip_sep(" +
                expr(*e.args[1]) + "), " + lvalue(*e.args[2]) +
                " = moss_read_int())";
+      case NativeLen:
+        return arrayBase(e.args[0]->type) + "_len(" + expr(*e.args[0]) + ")";
+      case NativeGrow:
+        return arrayBase(e.args[0]->type) + "_grow(" + expr(*e.args[0]) +
+               ", " + expr(*e.args[1]) + ")";
+      case NativeShrink:
+        return arrayBase(e.args[0]->type) + "_shrink(" + expr(*e.args[0]) +
+               ", " + expr(*e.args[1]) + ")";
       case NativeAskInt:
       case NativeAskStr:
       case NativeAskBool: {

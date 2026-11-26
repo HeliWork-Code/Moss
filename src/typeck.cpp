@@ -92,6 +92,12 @@ class Checker {
             if (st != TypeKind::Int)
               error(d.line, "array length must be int, not " +
                                 std::string(typeName(st)));
+            if (d.maxSize) {
+              Type mt = checkExpr(*d.maxSize);
+              if (mt != TypeKind::Int)
+                error(d.line, "array capacity must be int, not " +
+                                  std::string(typeName(mt)));
+            }
             if (d.init) error(d.line, "arrays cannot have an initializer yet");
           }
           if (d.init) {

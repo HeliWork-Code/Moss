@@ -241,7 +241,18 @@ class Parser {
         d.name = expect(Tok::Ident, "array name").text;
         d.type = Type::ofArray(elem);
         expect(Tok::LBracket, "'[' with the array length");
-        d.size = parseExpr();
+        if (check(Tok::Tilde)) {
+          advance();
+          d.size = Expr::intLit(0, t.line);
+          d.growable = true;
+          if (!check(Tok::RBracket)) d.maxSize = parseExpr();
+        } else {
+          d.size = parseExpr();
+          if (match(Tok::Tilde)) {
+            d.growable = true;
+            if (!check(Tok::RBracket)) d.maxSize = parseExpr();
+          }
+        }
         expect(Tok::RBracket, "']'");
         items.push_back(std::move(d));
         if (!match(Tok::Comma)) break;
@@ -426,7 +437,18 @@ class Parser {
         d.name = expect(Tok::Ident, "array name").text;
         d.type = Type::ofArray(elem);
         expect(Tok::LBracket, "'[' with the array length");
-        d.size = parseExpr();
+        if (check(Tok::Tilde)) {
+          advance();
+          d.size = Expr::intLit(0, t.line);
+          d.growable = true;
+          if (!check(Tok::RBracket)) d.maxSize = parseExpr();
+        } else {
+          d.size = parseExpr();
+          if (match(Tok::Tilde)) {
+            d.growable = true;
+            if (!check(Tok::RBracket)) d.maxSize = parseExpr();
+          }
+        }
         expect(Tok::RBracket, "']'");
         items.push_back(std::move(d));
         if (!match(Tok::Comma)) break;

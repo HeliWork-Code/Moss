@@ -46,6 +46,9 @@ const char* opName(Op op) {
     case Op::NewArray: return "new_array";
     case Op::GetIndex: return "get_index";
     case Op::SetIndex: return "set_index";
+    case Op::Len: return "len";
+    case Op::Grow: return "grow";
+    case Op::Shrink: return "shrink";
     case Op::Halt: return "halt";
   }
   return "?";
