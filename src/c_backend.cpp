@@ -106,6 +106,7 @@ class CEmitter {
   std::ostringstream out;
   std::map<const FuncDecl*, std::string> names;
   int indentLevel = 0;
+  int tmpCounter = 0;
 
   void pad() {
     for (int i = 0; i < indentLevel; ++i) out << "  ";
@@ -116,7 +117,9 @@ class CEmitter {
     for (const FuncDecl* f : prog.bodies) {
       std::string n = "m_";
       n += f->module.empty() ? "self" : f->module;
-      n += "__" + f->name + "__";
+      n += "__";
+      n += f->methodOf.empty() ? f->name : f->methodOf + "_" + f->name;
+      n += "__";
       if (f->params.empty()) n += "v";
       for (const Param& p : f->params) {
         n += typeCode(p.type);
@@ -281,6 +284,54 @@ class CEmitter {
         emitBody(*s.body);
         break;
 
+      case Stmt::Kind::ForEach: {
+        pad();
+        out << "{\n";
+        ++indentLevel;
+        if (s.isRange) {
+          std::string v = cvar(s.varName);
+          pad();
+          out << "for (int64_t " << v << " = " << expr(*s.from) << "; " << v
+              << " <= " << expr(*s.to) << "; " << v << " = " << v
+              << " + 1) {\n";
+          ++indentLevel;
+          if (s.body->kind == Stmt::Kind::Block)
+            for (const auto& st : s.body->stmts) stmt(*st);
+          else
+            stmt(*s.body);
+          --indentLevel;
+          pad();
+          out << "}\n";
+        } else {
+          Type it = s.expr->type;
+          int id = ++tmpCounter;
+          std::string tmp = "v_it" + std::to_string(id);
+          std::string idx = "v_i" + std::to_string(id);
+          pad();
+          out << arrayBase(it) << "* " << tmp << " = " << expr(*s.expr)
+              << ";\n";
+          pad();
+          out << "for (int64_t " << idx << " = 0; " << idx << " < "
+              << arrayBase(it) << "_len(" << tmp << "); " << idx << " = " << idx
+              << " + 1) {\n";
+          ++indentLevel;
+          pad();
+          out << ctype(*it.elem) << " " << cvar(s.varName) << " = moss_at_"
+              << arraySuffix(it) << "(" << tmp << ", " << idx << ");\n";
+          if (s.body->kind == Stmt::Kind::Block)
+            for (const auto& st : s.body->stmts) stmt(*st);
+          else
+            stmt(*s.body);
+          --indentLevel;
+          pad();
+          out << "}\n";
+        }
+        --indentLevel;
+        pad();
+        out << "}\n";
+        break;
+      }
+
       case Stmt::Kind::Block:
         pad();
         out << "{\n";
@@ -330,6 +381,13 @@ class CEmitter {
         return binary(e);
       case Expr::Kind::Call:
         return call(e);
+      case Expr::Kind::MethodCall: {
+        const FuncDecl* f = e.resolved;
+        if (!f) return "0";
+        std::string s = names.at(f) + "(" + expr(*e.lhs);
+        for (const auto& a : e.args) s += ", " + expr(*a);
+        return s + ")";
+      }
       case Expr::Kind::Member:
         return "(" + expr(*e.lhs) + ")->f_" + e.name;
       case Expr::Kind::Index:

@@ -22,6 +22,7 @@ const char* tokName(Tok k) {
     case Tok::KwWhile: return "while";
     case Tok::KwFor: return "for";
     case Tok::KwWhen: return "when";
+    case Tok::KwIn: return "in";
     case Tok::KwReturn: return "return";
     case Tok::KwTrue: return "true";
     case Tok::KwFalse: return "false";
@@ -193,6 +194,7 @@ struct Lexer {
         else if (id == "while") k = Tok::KwWhile;
         else if (id == "for") k = Tok::KwFor;
         else if (id == "when") k = Tok::KwWhen;
+        else if (id == "in") k = Tok::KwIn;
         else if (id == "return") k = Tok::KwReturn;
         else if (id == "true") k = Tok::KwTrue;
         else if (id == "false") k = Tok::KwFalse;

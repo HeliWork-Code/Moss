@@ -41,7 +41,7 @@ using StmtPtr = std::unique_ptr<Stmt>;
 using CapScope = std::unordered_map<std::string, std::vector<const FuncDecl*>>;
 
 struct Expr {
-  enum class Kind { IntLit, BoolLit, StrLit, Var, Unary, Binary, Call, Mention, Member, Index };
+  enum class Kind { IntLit, BoolLit, StrLit, Var, Unary, Binary, Call, Mention, Member, Index, MethodCall };
 
   Kind kind;
   Type type = TypeKind::Error;  // filled in by the type checker
@@ -54,7 +54,7 @@ struct Expr {
   std::string op;     // Unary, Binary
   ExprPtr lhs;
   ExprPtr rhs;
-  std::vector<ExprPtr> args;
+  std::vector<ExprPtr> args;   // Call; MethodCall uses lhs as the receiver
 
   const FuncDecl* resolved = nullptr;  // Call: the function it resolves to
 
@@ -72,6 +72,8 @@ struct Expr {
   static ExprPtr mention(ExprPtr operand, int line);
   static ExprPtr member(ExprPtr base, const std::string& field, int line);
   static ExprPtr index(ExprPtr base, ExprPtr idx, int line);
+  static ExprPtr methodCall(ExprPtr recv, const std::string& name,
+                            std::vector<ExprPtr> args, int line);
 };
 
 struct DeclItem {
@@ -85,7 +87,7 @@ struct DeclItem {
 };
 
 struct Stmt {
-  enum class Kind { Decl, Assign, Expr, Return, If, While, For, Go, Block };
+  enum class Kind { Decl, Assign, Expr, Return, If, While, For, Go, ForEach, Block };
 
   Kind kind;
   int line = 0;
@@ -94,7 +96,9 @@ struct Stmt {
   ExprPtr target;               // Assign: Var or Member
   ExprPtr expr;                 // Assign value, Expr, Return value,
                                 // If/While condition
-  ExprPtr from;                 // Go: range start
+  std::string varName;          // ForEach: loop variable
+  bool isRange = false;         // ForEach: `1~n` vs `array`
+  ExprPtr from;                 // Go range start; ForEach range start
   ExprPtr to;                   // Go: range end
   ExprPtr filter;               // Go: optional `when` condition
   StmtPtr init;                 // For: initialization clause
@@ -116,6 +120,9 @@ struct Stmt {
                          StmtPtr body, int line);
   static StmtPtr goStmt(ExprPtr from, ExprPtr to, ExprPtr filter,
                         StmtPtr body, int line);
+  static StmtPtr forEach(const std::string& var, bool isRange, ExprPtr from,
+                         ExprPtr to, ExprPtr iterable, StmtPtr body,
+                         int line);
   static StmtPtr block(std::vector<StmtPtr> body, int line);
 };
 
@@ -134,6 +141,7 @@ struct FuncDecl {
   int line = 0;
 
   std::string module;        // "" = main file
+  std::string methodOf;      // struct name when this is a method
   bool isNative = false;
   int nativeId = -1;         // see NativeId in program.h
   int bcIndex = -1;          // assigned by codegen
@@ -164,6 +172,7 @@ struct StructField {
 struct StructDecl {
   std::string name;
   std::vector<StructField> fields;
+  std::vector<std::unique_ptr<FuncDecl>> methods;
   int line = 0;
 };
 

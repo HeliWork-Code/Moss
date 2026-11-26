@@ -33,6 +33,8 @@ struct LoadedProgram {
   std::vector<std::unique_ptr<CapScope>> scopes;     // stable addresses
   std::vector<std::unique_ptr<StructDecl>> structs;  // owned struct declarations
   std::map<std::string, const StructDecl*> structMap;
+  // struct name -> method name -> method
+  std::map<std::string, std::map<std::string, const FuncDecl*>> methods;
   std::vector<const FuncDecl*> bodies;               // functions to compile
   FuncDecl* mainFn = nullptr;
 };

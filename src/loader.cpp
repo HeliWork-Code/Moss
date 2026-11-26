@@ -65,6 +65,24 @@ class Loader {
       }
       mod.second.caps.clear();
     }
+    // Methods become ordinary functions whose first parameter is `self`.
+    for (auto& sd : prog.structs) {
+      for (auto& m : sd->methods) {
+        m->module = "";
+        m->methodOf = sd->name;
+        m->scope = &mainScope;
+        m->params.insert(m->params.begin(),
+                         Param{"self", Type::ofStruct(sd->name), false});
+        if (prog.methods[sd->name].count(m->name))
+          throw LoadError("duplicate method '" + m->name + "' in struct '" +
+                              sd->name + "'",
+                          m->line);
+        prog.methods[sd->name][m->name] = m.get();
+        prog.bodies.push_back(m.get());
+        prog.functions.push_back(std::move(m));
+      }
+      sd->methods.clear();
+    }
     for (const FuncDecl* f : mainFns) prog.bodies.push_back(f);
     return std::move(prog);
   }

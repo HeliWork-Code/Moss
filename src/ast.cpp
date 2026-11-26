@@ -83,6 +83,16 @@ ExprPtr Expr::index(ExprPtr base, ExprPtr idx, int line) {
   return e;
 }
 
+ExprPtr Expr::methodCall(ExprPtr recv, const std::string& name,
+                         std::vector<ExprPtr> args, int line) {
+  ExprPtr e(new Expr(Kind::MethodCall));
+  e->lhs = std::move(recv);
+  e->name = name;
+  e->args = std::move(args);
+  e->line = line;
+  return e;
+}
+
 ExprPtr Expr::mention(ExprPtr operand, int line) {
   ExprPtr e(new Expr(Kind::Mention));
   e->lhs = std::move(operand);
@@ -146,6 +156,18 @@ StmtPtr Stmt::goStmt(ExprPtr from, ExprPtr to, ExprPtr filter, StmtPtr body,
   s->from = std::move(from);
   s->to = std::move(to);
   s->filter = std::move(filter);
+  s->body = std::move(body);
+  s->line = line;
+  return s;
+}
+StmtPtr Stmt::forEach(const std::string& var, bool isRange, ExprPtr from,
+                      ExprPtr to, ExprPtr iterable, StmtPtr body, int line) {
+  StmtPtr s(new Stmt(Kind::ForEach));
+  s->varName = var;
+  s->isRange = isRange;
+  s->from = std::move(from);
+  s->to = std::move(to);
+  s->expr = std::move(iterable);
   s->body = std::move(body);
   s->line = line;
   return s;

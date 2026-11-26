@@ -299,6 +299,20 @@ class Parser {
     }
 
     if (match(Tok::KwFor)) {
+      if (!check(Tok::LParen)) {
+        const Token& var = expect(Tok::Ident, "loop variable");
+        expect(Tok::KwIn, "'in' after the loop variable");
+        ExprPtr first = parseExpr();
+        if (match(Tok::Tilde)) {
+          ExprPtr to = parseExpr();
+          StmtPtr body = parseStmt();
+          return Stmt::forEach(var.text, true, std::move(first), std::move(to),
+                               nullptr, std::move(body), var.line);
+        }
+        StmtPtr body = parseStmt();
+        return Stmt::forEach(var.text, false, nullptr, nullptr,
+                             std::move(first), std::move(body), var.line);
+      }
       expect(Tok::LParen, "'(' after 'for'");
       StmtPtr init;
       if (!check(Tok::Semi)) init = parseSimpleStmt();
@@ -482,7 +496,19 @@ class Parser {
   ExprPtr parsePostfix(ExprPtr e) {
     for (;;) {
       if (match(Tok::Dot)) {
-        const Token& f = expect(Tok::Ident, "field name");
+        const Token& f = expect(Tok::Ident, "field or method name");
+        if (match(Tok::LParen)) {
+          std::vector<ExprPtr> args;
+          if (!check(Tok::RParen)) {
+            for (;;) {
+              args.push_back(parseExpr());
+              if (!match(Tok::Comma)) break;
+            }
+          }
+          expect(Tok::RParen, "')'");
+          e = Expr::methodCall(std::move(e), f.text, std::move(args), f.line);
+          continue;
+        }
         e = Expr::member(std::move(e), f.text, f.line);
         continue;
       }
@@ -506,6 +532,10 @@ class Parser {
     expect(Tok::LBrace, "'{'");
     while (!check(Tok::RBrace)) {
       if (check(Tok::Eof)) error("unterminated struct declaration");
+      if (check(Tok::KwFn)) {
+        sd->methods.push_back(parseFn());
+        continue;
+      }
       StructField f;
       f.type = parseType();
       f.line = peek().line;

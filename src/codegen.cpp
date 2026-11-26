@@ -239,6 +239,59 @@ class CodeGen {
         break;
       }
 
+      case Stmt::Kind::ForEach: {
+        scopes.emplace_back();
+        if (s.isRange) {
+          int v = declare(s.varName);
+          int endSlot = nextSlot++;
+          genExpr(*s.from);
+          emit(Op::StoreLocal, v);
+          genExpr(*s.to);
+          emit(Op::StoreLocal, endSlot);
+          int loop = here();
+          emit(Op::LoadLocal, v);
+          emit(Op::LoadLocal, endSlot);
+          emit(Op::LeInt);
+          int jz = here();
+          emit(Op::Jz, -1);
+          genStmt(*s.body);
+          emit(Op::LoadLocal, v);
+          emit(Op::PushInt, 1);
+          emit(Op::AddInt);
+          emit(Op::StoreLocal, v);
+          emit(Op::Jmp, loop);
+          patch(jz, here());
+        } else {
+          int arrSlot = nextSlot++;
+          genExpr(*s.expr);
+          emit(Op::StoreLocal, arrSlot);
+          int idxSlot = nextSlot++;
+          emit(Op::PushInt, 0);
+          emit(Op::StoreLocal, idxSlot);
+          int v = declare(s.varName);
+          int loop = here();
+          emit(Op::LoadLocal, idxSlot);
+          emit(Op::LoadLocal, arrSlot);
+          emit(Op::Len);
+          emit(Op::LtInt);
+          int jz = here();
+          emit(Op::Jz, -1);
+          emit(Op::LoadLocal, arrSlot);
+          emit(Op::LoadLocal, idxSlot);
+          emit(Op::GetIndex);
+          emit(Op::StoreLocal, v);
+          genStmt(*s.body);
+          emit(Op::LoadLocal, idxSlot);
+          emit(Op::PushInt, 1);
+          emit(Op::AddInt);
+          emit(Op::StoreLocal, idxSlot);
+          emit(Op::Jmp, loop);
+          patch(jz, here());
+        }
+        scopes.pop_back();
+        break;
+      }
+
       case Stmt::Kind::Block: {
         scopes.emplace_back();
         for (const auto& st : s.stmts) genStmt(*st);
@@ -272,6 +325,14 @@ class CodeGen {
         genExpr(*e.rhs);
         emit(Op::GetIndex);
         break;
+      case Expr::Kind::MethodCall: {
+        const FuncDecl* f = e.resolved;
+        if (!f) throw CodegenError("internal: unresolved method call");
+        genExpr(*e.lhs);  // receiver becomes the `self` argument
+        for (const auto& a : e.args) genExpr(*a);
+        emit(Op::Call, f->bcIndex);
+        break;
+      }
     }
   }
 

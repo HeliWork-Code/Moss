@@ -21,6 +21,7 @@ class Checker {
   std::vector<std::unordered_map<std::string, VarInfo>> scopes;
   Type currentRet = TypeKind::Void;
   bool currentIsMain = false;
+  std::string currentStruct;  // set while checking a method
 
   [[noreturn]] void error(int line, const std::string& msg) const {
     throw TypeCheckError(msg, line);
@@ -44,6 +45,14 @@ class Checker {
     scope[name] = VarInfo{type};
   }
 
+  const VarInfo* findVar(const std::string& name) const {
+    for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
+      auto found = it->find(name);
+      if (found != it->end()) return &found->second;
+    }
+    return nullptr;
+  }
+
   const VarInfo& lookup(int line, const std::string& name) const {
     for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
       auto found = it->find(name);
@@ -58,6 +67,7 @@ class Checker {
     currentScope = f.scope;
     currentRet = f.returnType;
     currentIsMain = f.isMain;
+    currentStruct = f.methodOf;
 
     for (const auto& p : f.params) declare(f.line, p.name, p.type);
     for (const auto& s : f.body) checkStmt(*s);
@@ -195,6 +205,26 @@ class Checker {
         break;
       }
 
+      case Stmt::Kind::ForEach: {
+        scopes.emplace_back();
+        if (s.isRange) {
+          Type a = checkExpr(*s.from);
+          Type b = checkExpr(*s.to);
+          if (a != TypeKind::Int || b != TypeKind::Int)
+            error(s.line, "for range bounds must be int");
+          declare(s.line, s.varName, TypeKind::Int);
+        } else {
+          Type it = checkExpr(*s.expr);
+          if (!it.isArray())
+            error(s.line, std::string("'for ... in' requires an array, got ") +
+                              typeName(it));
+          declare(s.line, s.varName, *it.elem);
+        }
+        checkStmt(*s.body);
+        scopes.pop_back();
+        break;
+      }
+
       case Stmt::Kind::Block: {
         scopes.emplace_back();
         for (const auto& st : s.stmts) checkStmt(*st);
@@ -216,7 +246,7 @@ class Checker {
       case Expr::Kind::IntLit: t = TypeKind::Int; break;
       case Expr::Kind::BoolLit: t = TypeKind::Bool; break;
       case Expr::Kind::StrLit: t = TypeKind::Str; break;
-      case Expr::Kind::Var: t = lookup(e.line, e.name).type; break;
+      case Expr::Kind::Var: t = checkVar(e); break;
 
       case Expr::Kind::Unary: {
         Type a = requireValue(checkExpr(*e.lhs), e.line);
@@ -246,6 +276,10 @@ class Checker {
 
       case Expr::Kind::Member:
         t = checkMember(e);
+        break;
+
+      case Expr::Kind::MethodCall:
+        t = checkMethodCall(e);
         break;
 
       case Expr::Kind::Index:
@@ -305,7 +339,7 @@ class Checker {
 
   Type checkLValue(Expr& e) {
     if (e.kind == Expr::Kind::Var) {
-      e.type = lookup(e.line, e.name).type;
+      e.type = checkVar(e);
       return e.type;
     }
     if (e.kind == Expr::Kind::Member) {
@@ -329,6 +363,51 @@ class Checker {
       error(e.line, std::string("array index must be int, not ") +
                         typeName(idx));
     return *base.elem;
+  }
+
+  // A bare name inside a method may refer to a field of the receiver.
+  Type checkVar(Expr& e) {
+    if (const VarInfo* v = findVar(e.name)) return v->type;
+    if (!currentStruct.empty()) {
+      auto sit = prog->structMap.find(currentStruct);
+      if (sit != prog->structMap.end())
+        for (const StructField& f : sit->second->fields)
+          if (f.name == e.name) {
+            ExprPtr self = Expr::var("self", e.line);
+            self->type = Type::ofStruct(currentStruct);
+            e.lhs = std::move(self);
+            e.kind = Expr::Kind::Member;
+            return f.type;
+          }
+    }
+    error(e.line, "use of undeclared variable '" + e.name + "'");
+  }
+
+  Type checkMethodCall(Expr& e) {
+    Type recv = requireValue(checkExpr(*e.lhs), e.line);
+    if (!recv.isStruct())
+      error(e.line, std::string("'.' method call requires a struct, got ") +
+                        typeName(recv));
+    auto sit = prog->methods.find(recv.sname);
+    if (sit == prog->methods.end())
+      error(e.line, "struct '" + recv.sname + "' has no method '" + e.name + "'");
+    auto mit = sit->second.find(e.name);
+    if (mit == sit->second.end())
+      error(e.line, "struct '" + recv.sname + "' has no method '" + e.name + "'");
+    const FuncDecl* m = mit->second;
+    if (e.args.size() + 1 != m->params.size())
+      error(e.line, "method '" + e.name + "' expects " +
+                        std::to_string(m->params.size() - 1) +
+                        " argument(s), got " + std::to_string(e.args.size()));
+    for (size_t i = 0; i < e.args.size(); ++i) {
+      Type at = checkExpr(*e.args[i]);
+      if (at != m->params[i + 1].type)
+        error(e.line, "argument " + std::to_string(i + 1) + " of method '" +
+                          e.name + "': expected " + typeName(m->params[i + 1].type) +
+                          " but got " + typeName(at));
+    }
+    e.resolved = m;
+    return m->returnType;
   }
 
   Type checkMember(Expr& e) {

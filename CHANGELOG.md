@@ -23,6 +23,9 @@ Versions are `[year].[major].[pre-release]`:
   unbounded), `a[1~]` (starts at 1, unbounded), `a[~10]` (empty, at most 10).
 - `len`, `grow` and `shrink` as core capabilities, with one overload set per
   element type (`int`, `bool`, `string`).
+- Methods declared inside `struct` bodies: fields are in scope directly and
+  the receiver is the implicit `self` parameter.
+- `for x in a` over arrays and `for i in a~b` over integer ranges.
 - Continuous integration: the compiler is built and the full test suite runs
   on Linux and Windows for every push and pull request.
 

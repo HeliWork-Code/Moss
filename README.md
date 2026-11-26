@@ -130,6 +130,35 @@ shrink @b 1;
 show @len(b);           // 3
 ```
 
+Structs can declare methods; fields are in scope directly and `self` is the
+receiver:
+
+```moss
+struct Point {
+  int x;
+  int y;
+  fn int sum() { return x + y; }
+}
+
+Point p;
+p.x = 3;
+p.y = 4;
+show @p.sum();   // 7
+```
+
+`for ... in` walks a range or an array:
+
+```moss
+for i in 1~3 {
+  show @i;
+}
+
+array int a[3];
+for v in a {
+  show @v;
+}
+```
+
 ## Two backends
 
 | Command | Output |
@@ -181,16 +210,17 @@ examples/                small programs
 
 ## Status and limitations
 
-Works today: `int`, `bool`, `string`, `void`, structs (reference semantics),
+Works today: `int`, `bool`, `string`, `void`, structs (reference semantics,
+methods with implicit `self`),
 arrays with fixed, runtime or growable lengths plus bounds and capacity
 checks, `len`/`grow`/`shrink`, functions, `if`/`else`, `while`, `for`,
-`__go`, capabilities with `pick`, aliasing, overloads, `mut` parameters,
-`@` mentions, string concatenation and comparison, `ask`/`input`/`show`
-style I/O.
+`for ... in` over ranges and arrays, `__go`, capabilities with `pick`,
+aliasing, overloads, `mut` parameters, `@` mentions, string concatenation
+and comparison, `ask`/`input`/`show` style I/O.
 
 Not yet: collections (lists, maps), first-class functions, enums and pattern
-matching, generics, methods on structs, struct literals, structs in modules,
-error handling, 2D arrays.
+matching, generics, struct literals, structs in modules, error handling,
+2D arrays.
 
 Generated C leaks strings (no deallocator yet); programs are meant to be
 short-lived.
