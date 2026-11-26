@@ -1,6 +1,14 @@
 #include "ast.h"
 #include <cstdio>
 
+Type Type::ofArray(Type elem) {
+  Type t;
+  t.kind = TypeKind::Array;
+  t.elem = std::make_shared<Type>(elem);
+  t.sname = "array<" + std::string(typeName(elem)) + ">";
+  return t;
+}
+
 const char* typeName(const Type& t) {
   switch (t.kind) {
     case TypeKind::Int: return "int";
@@ -8,6 +16,7 @@ const char* typeName(const Type& t) {
     case TypeKind::Str: return "string";
     case TypeKind::Void: return "void";
     case TypeKind::Struct: return t.sname.c_str();
+    case TypeKind::Array: return t.sname.c_str();
     case TypeKind::Error: return "<error>";
   }
   return "?";
@@ -66,6 +75,14 @@ ExprPtr Expr::member(ExprPtr base, const std::string& field, int line) {
   e->line = line;
   return e;
 }
+ExprPtr Expr::index(ExprPtr base, ExprPtr idx, int line) {
+  ExprPtr e(new Expr(Kind::Index));
+  e->lhs = std::move(base);
+  e->rhs = std::move(idx);
+  e->line = line;
+  return e;
+}
+
 ExprPtr Expr::mention(ExprPtr operand, int line) {
   ExprPtr e(new Expr(Kind::Mention));
   e->lhs = std::move(operand);
@@ -176,6 +193,11 @@ void dumpExpr(const Expr& e, int ind) {
       std::printf("Member .%s\n", e.name.c_str());
       dumpExpr(*e.lhs, ind + 1);
       break;
+    case Expr::Kind::Index:
+      std::printf("Index\n");
+      dumpExpr(*e.lhs, ind + 1);
+      dumpExpr(*e.rhs, ind + 1);
+      break;
   }
 }
 
@@ -187,6 +209,7 @@ void dumpStmt(const Stmt& s, int ind) {
       for (const auto& d : s.decls) {
         pad(ind + 1);
         std::printf("%s: %s\n", d.name.c_str(), typeName(d.type));
+        if (d.size) dumpExpr(*d.size, ind + 2);
         if (d.init) dumpExpr(*d.init, ind + 2);
       }
       break;

@@ -43,6 +43,9 @@ const char* opName(Op op) {
     case Op::NewObj: return "new_obj";
     case Op::GetField: return "get_field";
     case Op::SetField: return "set_field";
+    case Op::NewArray: return "new_array";
+    case Op::GetIndex: return "get_index";
+    case Op::SetIndex: return "set_index";
     case Op::Halt: return "halt";
   }
   return "?";

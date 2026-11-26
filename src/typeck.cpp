@@ -87,6 +87,13 @@ class Checker {
     switch (s.kind) {
       case Stmt::Kind::Decl:
         for (const DeclItem& d : s.decls) {
+          if (d.size) {
+            Type st = checkExpr(*d.size);
+            if (st != TypeKind::Int)
+              error(d.line, "array length must be int, not " +
+                                std::string(typeName(st)));
+            if (d.init) error(d.line, "arrays cannot have an initializer yet");
+          }
           if (d.init) {
             Type t = checkExpr(*d.init);
             if (t == TypeKind::Void)
@@ -235,6 +242,10 @@ class Checker {
         t = checkMember(e);
         break;
 
+      case Expr::Kind::Index:
+        t = checkIndex(e);
+        break;
+
       // A mention '@x' is transparent: it just points at the thing named and
       // has the same type. Whether it may be written to is decided by the
       // capability's 'mut' marker, not by '@'.
@@ -295,7 +306,23 @@ class Checker {
       e.type = checkMember(e);
       return e.type;
     }
-    error(e.line, "left-hand side of '=' must be a variable or a field");
+    if (e.kind == Expr::Kind::Index) {
+      e.type = checkIndex(e);
+      return e.type;
+    }
+    error(e.line, "left-hand side of '=' must be a variable, field or element");
+  }
+
+  Type checkIndex(Expr& e) {
+    Type base = requireValue(checkExpr(*e.lhs), e.line);
+    if (!base.isArray())
+      error(e.line, std::string("'[]' requires an array, got ") +
+                        typeName(base));
+    Type idx = requireValue(checkExpr(*e.rhs), e.line);
+    if (idx != TypeKind::Int)
+      error(e.line, std::string("array index must be int, not ") +
+                        typeName(idx));
+    return *base.elem;
   }
 
   Type checkMember(Expr& e) {

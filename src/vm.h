@@ -28,7 +28,8 @@ class VM {
   const BytecodeProgram& prog;
   std::string mainArgs;
   std::vector<Value> stack;
-  std::vector<std::vector<Value>> heap;  // struct instances
+  std::vector<std::vector<Value>> heap;    // struct instances
+  std::vector<std::vector<Value>> arrays;  // array elements
   std::vector<Frame> frames;
   long long steps = 0;
   long long stepLimit = 100000000;

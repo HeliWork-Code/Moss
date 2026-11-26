@@ -109,6 +109,67 @@ static void moss_skip_sep(moss_str sep) {
   }
 }
 
+typedef struct { int64_t* data; int64_t len; } moss_arr_int;
+typedef struct { bool* data; int64_t len; } moss_arr_bool;
+typedef struct { moss_str* data; int64_t len; } moss_arr_str;
+
+static int64_t moss_index(int64_t i, int64_t n) {
+  if (i < 0 || i >= n) {
+    char buf[96];
+    snprintf(buf, sizeof buf, "array index %lld out of range (length %lld)",
+             (long long)i, (long long)n);
+    moss_panic(buf);
+  }
+  return i;
+}
+
+static moss_arr_int moss_arr_int_new(int64_t n) {
+  moss_arr_int a;
+  if (n < 0) moss_panic("negative array length");
+  a.len = n;
+  a.data = (int64_t*)calloc((size_t)(n ? n : 1), sizeof(int64_t));
+  if (!a.data) moss_panic("out of memory");
+  return a;
+}
+
+static moss_arr_bool moss_arr_bool_new(int64_t n) {
+  moss_arr_bool a;
+  if (n < 0) moss_panic("negative array length");
+  a.len = n;
+  a.data = (bool*)calloc((size_t)(n ? n : 1), sizeof(bool));
+  if (!a.data) moss_panic("out of memory");
+  return a;
+}
+
+static moss_arr_str moss_arr_str_new(int64_t n) {
+  moss_arr_str a;
+  if (n < 0) moss_panic("negative array length");
+  a.len = n;
+  a.data = (moss_str*)calloc((size_t)(n ? n : 1), sizeof(moss_str));
+  if (!a.data) moss_panic("out of memory");
+  return a;
+}
+
+// Accessors keep the array expression evaluated exactly once on the C side.
+static int64_t moss_at_int(moss_arr_int a, int64_t i) {
+  return a.data[moss_index(i, a.len)];
+}
+static void moss_set_int(moss_arr_int a, int64_t i, int64_t v) {
+  a.data[moss_index(i, a.len)] = v;
+}
+static bool moss_at_bool(moss_arr_bool a, int64_t i) {
+  return a.data[moss_index(i, a.len)];
+}
+static void moss_set_bool(moss_arr_bool a, int64_t i, bool v) {
+  a.data[moss_index(i, a.len)] = v;
+}
+static moss_str moss_at_str(moss_arr_str a, int64_t i) {
+  return a.data[moss_index(i, a.len)];
+}
+static void moss_set_str(moss_arr_str a, int64_t i, moss_str v) {
+  a.data[moss_index(i, a.len)] = v;
+}
+
 static moss_str moss_join_args(int argc, char** argv) {
   moss_str s = moss_str_make("", 0);
   for (int i = 1; i < argc; ++i) {

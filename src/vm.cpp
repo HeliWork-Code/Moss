@@ -19,6 +19,7 @@ std::string VM::format(const Value& v) {
     case Value::Tag::Str: return v.s;
     case Value::Tag::Unit: return "()";
     case Value::Tag::Obj: return "<object>";
+    case Value::Tag::Arr: return "<array>";
   }
   return "?";
 }
@@ -26,6 +27,7 @@ std::string VM::format(const Value& v) {
 int VM::run() {
   stack.clear();
   heap.clear();
+  arrays.clear();
   frames.clear();
   steps = 0;
   frames.push_back(Frame{0, 0, std::vector<Value>()});
@@ -237,6 +239,46 @@ int VM::run() {
         if (in.operand < 0 || (size_t)in.operand >= fields.size())
           throw RuntimeError("bad field index");
         fields[(size_t)in.operand] = std::move(v);
+        break;
+      }
+
+      case Op::NewArray: {
+        int64_t n = pop().i;
+        if (n < 0) throw RuntimeError("negative array length");
+        Value init = in.operand == 1 ? Value::bool_(false)
+                      : in.operand == 2 ? Value::str("")
+                                        : Value::int_(0);
+        arrays.emplace_back((size_t)n, init);
+        push(Value::arr((int64_t)arrays.size() - 1));
+        break;
+      }
+
+      case Op::GetIndex: {
+        int64_t idx = pop().i;
+        Value a = pop();
+        if (a.tag != Value::Tag::Arr)
+          throw RuntimeError("internal: index on a non-array");
+        auto& elems = arrays[(size_t)a.i];
+        if (idx < 0 || (size_t)idx >= elems.size())
+          throw RuntimeError("array index " + std::to_string(idx) +
+                             " out of range (length " +
+                             std::to_string(elems.size()) + ")");
+        push(elems[(size_t)idx]);
+        break;
+      }
+
+      case Op::SetIndex: {
+        Value v = pop();
+        int64_t idx = pop().i;
+        Value a = pop();
+        if (a.tag != Value::Tag::Arr)
+          throw RuntimeError("internal: index assignment on a non-array");
+        auto& elems = arrays[(size_t)a.i];
+        if (idx < 0 || (size_t)idx >= elems.size())
+          throw RuntimeError("array index " + std::to_string(idx) +
+                             " out of range (length " +
+                             std::to_string(elems.size()) + ")");
+        elems[(size_t)idx] = std::move(v);
         break;
       }
 

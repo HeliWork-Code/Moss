@@ -3,12 +3,13 @@
 
 enum class Tok {
   Eof, IntLit, StrLit, Ident,
-  KwPick, KwHead, KwAs, KwCap, KwMut, KwArgs, KwFn, KwStruct,
+  KwPick, KwHead, KwAs, KwCap, KwMut, KwArgs, KwFn, KwStruct, KwArray,
   KwIf, KwElse, KwWhile, KwFor, KwWhen, KwReturn, KwTrue, KwFalse,
   KwIntType, KwBoolType, KwStringType, KwVoidType,
   At,
   LParen, RParen, LBrace, RBrace, Comma, Semi, Colon, Dot,
   Assign, Eq, Ne, Lt, Le, Gt, Ge, AmpAmp, PipePipe, Bang, Tilde,
+  LBracket, RBracket,
   Plus, Minus, Star, Slash, Percent,
 };
 

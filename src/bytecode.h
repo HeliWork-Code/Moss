@@ -7,7 +7,7 @@
 // Runtime value. Tagged so that `print` works for any type and so later
 // features (ADTs, lists) can share the same representation.
 struct Value {
-  enum class Tag { Int, Bool, Str, Unit, Obj };
+  enum class Tag { Int, Bool, Str, Unit, Obj, Arr };
 
   Tag tag = Tag::Unit;
   int64_t i = 0;
@@ -33,6 +33,12 @@ struct Value {
     return x;
   }
   static Value unit() { return Value(); }
+  static Value arr(int64_t id) {
+    Value x;
+    x.tag = Tag::Arr;
+    x.i = id;
+    return x;
+  }
   static Value obj(int64_t id) {
     Value x;
     x.tag = Tag::Obj;
@@ -58,6 +64,9 @@ enum class Op : unsigned char {
   NewObj,       // push a fresh object of structs[operand]
   GetField,     // pop an object, push its field `operand`
   SetField,     // pop a value and an object, store the value in field
+  NewArray,     // pop a length, push a fresh array (operand = element tag)
+  GetIndex,     // pop index and array, push the element
+  SetIndex,     // pop value, index and array, store the element
   Halt,
 };
 

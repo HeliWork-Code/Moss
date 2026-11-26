@@ -91,6 +91,11 @@ class Parser {
 
   Type parseType() {
     const Token& t = peek();
+    // `array T` names an array type; the length is given at the declaration.
+    if (t.kind == Tok::KwArray) {
+      advance();
+      return Type::ofArray(parseType());
+    }
     if (t.kind == Tok::Ident) {
       advance();
       return Type::ofStruct(t.text);
@@ -224,6 +229,25 @@ class Parser {
       StmtPtr body = parseStmt();
       return Stmt::goStmt(std::move(from), std::move(to), std::move(filter),
                           std::move(body), start.line);
+    }
+
+    if (check(Tok::KwArray)) {
+      advance();
+      Type elem = parseType();
+      std::vector<DeclItem> items;
+      for (;;) {
+        DeclItem d;
+        d.line = t.line;
+        d.name = expect(Tok::Ident, "array name").text;
+        d.type = Type::ofArray(elem);
+        expect(Tok::LBracket, "'[' with the array length");
+        d.size = parseExpr();
+        expect(Tok::RBracket, "']'");
+        items.push_back(std::move(d));
+        if (!match(Tok::Comma)) break;
+      }
+      expect(Tok::Semi, "';'");
+      return Stmt::declStmt(std::move(items), t.line);
     }
 
     if (check(Tok::KwIntType) || check(Tok::KwBoolType) ||
@@ -392,6 +416,23 @@ class Parser {
   // A statement without its terminating ';' -- used by for(init;cond;update).
   StmtPtr parseSimpleStmt() {
     const Token& t = peek();
+    if (check(Tok::KwArray)) {
+      advance();
+      Type elem = parseType();
+      std::vector<DeclItem> items;
+      for (;;) {
+        DeclItem d;
+        d.line = t.line;
+        d.name = expect(Tok::Ident, "array name").text;
+        d.type = Type::ofArray(elem);
+        expect(Tok::LBracket, "'[' with the array length");
+        d.size = parseExpr();
+        expect(Tok::RBracket, "']'");
+        items.push_back(std::move(d));
+        if (!match(Tok::Comma)) break;
+      }
+      return Stmt::declStmt(std::move(items), t.line);
+    }
     if (check(Tok::KwIntType) || check(Tok::KwBoolType) ||
         check(Tok::KwStringType) ||
         (check(Tok::Ident) && peek(1).kind == Tok::Ident)) {
@@ -417,9 +458,20 @@ class Parser {
   }
 
   ExprPtr parsePostfix(ExprPtr e) {
-    while (match(Tok::Dot)) {
-      const Token& f = expect(Tok::Ident, "field name");
-      e = Expr::member(std::move(e), f.text, f.line);
+    for (;;) {
+      if (match(Tok::Dot)) {
+        const Token& f = expect(Tok::Ident, "field name");
+        e = Expr::member(std::move(e), f.text, f.line);
+        continue;
+      }
+      if (match(Tok::LBracket)) {
+        const Token& open = toks[pos - 1];
+        ExprPtr idx = parseExpr();
+        expect(Tok::RBracket, "']'");
+        e = Expr::index(std::move(e), std::move(idx), open.line);
+        continue;
+      }
+      break;
     }
     return e;
   }

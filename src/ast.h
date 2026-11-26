@@ -4,12 +4,13 @@
 #include <unordered_map>
 #include <vector>
 
-enum class TypeKind { Int, Bool, Str, Void, Error, Struct };
+enum class TypeKind { Int, Bool, Str, Void, Error, Struct, Array };
 
 // A Moss type: one of the builtins, or a struct identified by name.
 struct Type {
   TypeKind kind = TypeKind::Error;
-  std::string sname;  // struct name when kind == Struct
+  std::string sname;  // struct name (Struct) or element name (Array)
+  std::shared_ptr<Type> elem;  // element type when kind == Array
 
   Type() = default;
   Type(TypeKind k) : kind(k) {}  // NOLINT: implicit by design
@@ -19,7 +20,9 @@ struct Type {
     t.sname = std::move(name);
     return t;
   }
+  static Type ofArray(Type elem);
   bool isStruct() const { return kind == TypeKind::Struct; }
+  bool isArray() const { return kind == TypeKind::Array; }
   bool operator==(const Type& o) const {
     return kind == o.kind && sname == o.sname;
   }
@@ -38,7 +41,7 @@ using StmtPtr = std::unique_ptr<Stmt>;
 using CapScope = std::unordered_map<std::string, std::vector<const FuncDecl*>>;
 
 struct Expr {
-  enum class Kind { IntLit, BoolLit, StrLit, Var, Unary, Binary, Call, Mention, Member };
+  enum class Kind { IntLit, BoolLit, StrLit, Var, Unary, Binary, Call, Mention, Member, Index };
 
   Kind kind;
   Type type = TypeKind::Error;  // filled in by the type checker
@@ -68,12 +71,14 @@ struct Expr {
                       int line);
   static ExprPtr mention(ExprPtr operand, int line);
   static ExprPtr member(ExprPtr base, const std::string& field, int line);
+  static ExprPtr index(ExprPtr base, ExprPtr idx, int line);
 };
 
 struct DeclItem {
   std::string name;
-  Type type;
-  ExprPtr init;  // may be null
+  Type type;       // full type; for arrays this is Array(element)
+  ExprPtr init;    // may be null
+  ExprPtr size;    // array length expression, non-null only for arrays
   int line = 0;
 };
 

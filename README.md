@@ -109,6 +109,18 @@ fn int main() {
 }
 ```
 
+Arrays are fixed at creation time, default to zero, and are bounds-checked:
+
+```moss
+array int a[10];
+a[3] = 7;
+show @a[3];
+
+int n;
+n = 4;
+array string names[n];   // length can come from a variable
+```
+
 ## Two backends
 
 | Command | Output |
@@ -161,13 +173,14 @@ examples/                small programs
 ## Status and limitations
 
 Works today: `int`, `bool`, `string`, `void`, structs (reference semantics),
-functions, `if`/`else`, `while`, `for`, `__go`, capabilities with `pick`,
-aliasing, overloads, `mut` parameters, `@` mentions, string concatenation and
-comparison, `ask`/`input`/`show` style I/O.
+fixed and runtime-sized arrays with bounds checks, functions, `if`/`else`,
+`while`, `for`, `__go`, capabilities with `pick`, aliasing, overloads, `mut`
+parameters, `@` mentions, string concatenation and comparison,
+`ask`/`input`/`show` style I/O.
 
-Not yet: arrays and collections, first-class functions, enums and pattern
-matching, generics, methods on structs, struct literals, structs in modules,
-error handling.
+Not yet: dynamic array growth, collections (lists, maps), first-class
+functions, enums and pattern matching, generics, methods on structs, struct
+literals, structs in modules, error handling.
 
 Generated C leaks strings (no deallocator yet); programs are meant to be
 short-lived.

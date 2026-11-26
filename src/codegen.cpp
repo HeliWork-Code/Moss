@@ -88,6 +88,12 @@ class CodeGen {
     throw CodegenError("internal: unknown field '" + field + "'");
   }
 
+  static int elemTag(Type t) {
+    if (t.kind == TypeKind::Bool) return 1;
+    if (t.kind == TypeKind::Str) return 2;
+    return 0;
+  }
+
   void genDefault(Type t) {
     switch (t.kind) {
       case TypeKind::Int: emit(Op::PushInt, 0); break;
@@ -103,8 +109,14 @@ class CodeGen {
       case Stmt::Kind::Decl:
         for (const DeclItem& d : s.decls) {
           int slot = declare(d.name);
-          if (d.init) genExpr(*d.init);
-          else genDefault(d.type);
+          if (d.size) {
+            genExpr(*d.size);
+            emit(Op::NewArray, elemTag(*d.type.elem));
+          } else if (d.init) {
+            genExpr(*d.init);
+          } else {
+            genDefault(d.type);
+          }
           emit(Op::StoreLocal, slot);
         }
         break;
@@ -118,6 +130,11 @@ class CodeGen {
           genExpr(*tgt.lhs);
           genExpr(*s.expr);
           emit(Op::SetField, fieldIndex(tgt.lhs->type, tgt.name));
+        } else if (tgt.kind == Expr::Kind::Index) {
+          genExpr(*tgt.lhs);
+          genExpr(*tgt.rhs);
+          genExpr(*s.expr);
+          emit(Op::SetIndex);
         } else {
           throw CodegenError("internal: bad assignment target");
         }
@@ -243,6 +260,11 @@ class CodeGen {
       case Expr::Kind::Member:
         genExpr(*e.lhs);
         emit(Op::GetField, fieldIndex(e.lhs->type, e.name));
+        break;
+      case Expr::Kind::Index:
+        genExpr(*e.lhs);
+        genExpr(*e.rhs);
+        emit(Op::GetIndex);
         break;
     }
   }

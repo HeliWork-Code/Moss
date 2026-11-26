@@ -15,6 +15,10 @@ std::string ctype(Type t) {
     case TypeKind::Str: return "moss_str";
     case TypeKind::Void: return "void";
     case TypeKind::Struct: return "S_" + t.sname + "*";
+    case TypeKind::Array:
+      if (t.elem && t.elem->kind == TypeKind::Bool) return "moss_arr_bool";
+      if (t.elem && t.elem->kind == TypeKind::Str) return "moss_arr_str";
+      return "moss_arr_int";
     default: return "void";
   }
 }
@@ -26,6 +30,8 @@ std::string zeroValue(Type t) {
     case TypeKind::Str: return "moss_str_make(\"\", 0)";
     case TypeKind::Struct:
       return "((S_" + t.sname + "*)calloc(1, sizeof(S_" + t.sname + ")))";
+    case TypeKind::Array:
+      return ctype(t) + "_new(0)";
     default: return "0";
   }
 }
@@ -37,6 +43,8 @@ std::string typeCode(Type t) {
     case TypeKind::Str: return "s";
     case TypeKind::Void: return "v";
     case TypeKind::Struct: return "S" + t.sname;
+    case TypeKind::Array:
+      return "A" + (t.elem ? typeCode(*t.elem) : std::string("e"));
     default: return "e";
   }
 }
@@ -180,7 +188,9 @@ class CEmitter {
         for (const DeclItem& d : s.decls) {
           pad();
           out << ctype(d.type) << " " << cvar(d.name) << " = ";
-          if (d.init) out << expr(*d.init);
+          if (d.size)
+            out << ctype(d.type) << "_new(" << expr(*d.size) << ")";
+          else if (d.init) out << expr(*d.init);
           else out << zeroValue(d.type);
           out << ";\n";
         }
@@ -188,7 +198,13 @@ class CEmitter {
 
       case Stmt::Kind::Assign:
         pad();
-        out << expr(*s.target) << " = " << expr(*s.expr) << ";\n";
+        if (s.target->kind == Expr::Kind::Index) {
+          out << "moss_set_" << arraySuffix(s.target->lhs->type) << "("
+              << expr(*s.target->lhs) << ", " << expr(*s.target->rhs) << ", "
+              << expr(*s.expr) << ");\n";
+        } else {
+          out << expr(*s.target) << " = " << expr(*s.expr) << ";\n";
+        }
         break;
 
       case Stmt::Kind::Expr:
@@ -266,6 +282,12 @@ class CEmitter {
     }
   }
 
+  static std::string arraySuffix(Type arr) {
+    if (arr.elem && arr.elem->kind == TypeKind::Bool) return "bool";
+    if (arr.elem && arr.elem->kind == TypeKind::Str) return "str";
+    return "int";
+  }
+
   static const Expr& unwrap(const Expr& e) {
     const Expr* p = &e;
     while (p->kind == Expr::Kind::Mention) p = p->lhs.get();
@@ -299,6 +321,9 @@ class CEmitter {
         return call(e);
       case Expr::Kind::Member:
         return "(" + expr(*e.lhs) + ")->f_" + e.name;
+      case Expr::Kind::Index:
+        return "moss_at_" + arraySuffix(e.lhs->type) + "(" + expr(*e.lhs) +
+               ", " + expr(*e.rhs) + ")";
     }
     return "0";
   }

@@ -16,6 +16,7 @@ const char* tokName(Tok k) {
     case Tok::KwArgs: return "args";
     case Tok::KwFn: return "fn";
     case Tok::KwStruct: return "struct";
+    case Tok::KwArray: return "array";
     case Tok::KwIf: return "if";
     case Tok::KwElse: return "else";
     case Tok::KwWhile: return "while";
@@ -48,6 +49,8 @@ const char* tokName(Tok k) {
     case Tok::PipePipe: return "||";
     case Tok::Bang: return "!";
     case Tok::Tilde: return "~";
+    case Tok::LBracket: return "[";
+    case Tok::RBracket: return "]";
     case Tok::Plus: return "+";
     case Tok::Minus: return "-";
     case Tok::Star: return "*";
@@ -184,6 +187,7 @@ struct Lexer {
         else if (id == "args") k = Tok::KwArgs;
         else if (id == "fn") k = Tok::KwFn;
         else if (id == "struct") k = Tok::KwStruct;
+        else if (id == "array") k = Tok::KwArray;
         else if (id == "if") k = Tok::KwIf;
         else if (id == "else") k = Tok::KwElse;
         else if (id == "while") k = Tok::KwWhile;
@@ -240,6 +244,8 @@ struct Lexer {
         case '>': toks.push_back(make(Tok::Gt, l, c)); break;
         case '!': toks.push_back(make(Tok::Bang, l, c)); break;
         case '~': toks.push_back(make(Tok::Tilde, l, c)); break;
+        case '[': toks.push_back(make(Tok::LBracket, l, c)); break;
+        case ']': toks.push_back(make(Tok::RBracket, l, c)); break;
         default:
           throw LexError(std::string("unexpected character '") + ch + "'", l, c);
       }
