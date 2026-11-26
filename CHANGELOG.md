@@ -3,7 +3,18 @@
 All notable changes to Moss are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] — next release
+## Versioning
+
+Versions are `[year].[major].[pre-release]`:
+
+- `26.0.1`, `26.0.2`, ... are pre-releases published in 2026 on the way to
+  the stable `26.1.0`.
+- `26.1.0` is the stable release of that line; the last number is `0` for
+  stable releases.
+- Pre-releases may change behaviour or syntax without notice; stable
+  releases keep compatibility within their major version.
+
+## [26.0.2] — unreleased
 
 ### Added
 
@@ -25,9 +36,10 @@ All notable changes to Moss are documented here. The format follows
 - `moss pack` now marks the packaged program executable on POSIX systems;
   before, the produced file could not be run on Linux.
 
-## [26.0.0] — 2026-11-26
+## [26.0.1] — 2026-11-26
 
-First public release.
+First pre-release, towards `26.1.0`. The GitHub release was published under
+the tag `26.0.0`; later releases follow the versioning scheme above.
 
 ### Added
 

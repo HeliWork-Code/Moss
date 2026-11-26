@@ -7,9 +7,9 @@
 A small, statically typed language built around **capabilities**: nothing is
 built in except the ability to `pick` what you need.
 
-> Status: experimental (v0.1). The compiler is self-hosted in the sense that
-> it has its own front end, bytecode backend, and a native C backend, but the
-> language is still growing.
+> Status: experimental. Versions are `[year].[major].[pre-release]`, so
+> `26.0.x` are pre-releases on the way to `26.1.0`. See
+> [CHANGELOG.md](CHANGELOG.md).
 
 ```
 moss 1000;
