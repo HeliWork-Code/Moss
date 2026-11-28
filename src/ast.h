@@ -41,7 +41,7 @@ using StmtPtr = std::unique_ptr<Stmt>;
 using CapScope = std::unordered_map<std::string, std::vector<const FuncDecl*>>;
 
 struct Expr {
-  enum class Kind { IntLit, BoolLit, StrLit, Var, Unary, Binary, Call, Mention, Member, Index, MethodCall };
+  enum class Kind { IntLit, BoolLit, StrLit, ArrayLit, NullLit, Var, Unary, Binary, Call, Mention, Member, Index, MethodCall };
 
   Kind kind;
   Type type = TypeKind::Error;  // filled in by the type checker
@@ -58,11 +58,20 @@ struct Expr {
 
   const FuncDecl* resolved = nullptr;  // Call: the function it resolves to
 
+  // For a variable of array type: the declared maximum length, or -1 when the
+  // array is unbounded (or the maximum is not a constant). Used by __roll to
+  // decide between growing and wrapping without a new runtime instruction.
+  long long arrCap = -1;
+
   explicit Expr(Kind k) : kind(k) {}
 
   static ExprPtr intLit(long long v, int line);
   static ExprPtr boolLit(bool v, int line);
   static ExprPtr strLit(const std::string& s, int line);
+  // An array literal `{a, b, c}`; elements are kept in `args`.
+  static ExprPtr arrayLit(std::vector<ExprPtr> elems, int line);
+  // `\null`: a hole in an array literal, meaning "do not write this slot".
+  static ExprPtr nullLit(int line);
   static ExprPtr var(const std::string& name, int line);
   static ExprPtr unary(const std::string& op, ExprPtr operand, int line);
   static ExprPtr binary(const std::string& op, ExprPtr lhs, ExprPtr rhs,
@@ -107,6 +116,7 @@ struct Stmt {
   StmtPtr body;                 // If then-branch, While/For body
   StmtPtr elseBody;             // If else-branch
   std::vector<StmtPtr> stmts;   // Block
+  bool roll = false;            // Assign: written with a leading `__roll`
 
   explicit Stmt(Kind k) : kind(k) {}
 

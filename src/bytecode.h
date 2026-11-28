@@ -85,9 +85,15 @@ struct BytecodeFn {
   std::vector<Instr> code;
 };
 
+// One struct field, as the VM needs it: what a fresh instance starts with.
+struct FieldLayout {
+  uint8_t kind = 0;    // 0 int, 1 bool, 2 string, 3 struct, 4 array
+  int32_t extra = -1;  // kind 3: the struct index; kind 4: the element kind
+};
+
 struct StructInfo {
   std::string name;
-  std::vector<uint8_t> fieldTypes;  // 0 = int, 1 = bool, 2 = string
+  std::vector<FieldLayout> fields;
 };
 
 struct BytecodeProgram {

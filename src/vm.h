@@ -43,5 +43,10 @@ class VM {
   void push(Value v) { stack.push_back(std::move(v)); }
   Value pop();
 
+  // Construction helpers, shared by `NewObj` and `NewArray`.
+  Value newObject(int structIndex);  // recursive: fresh nested fields
+  Value newArray(int elemTag, int64_t maxLen, int64_t n);
+  Value defaultField(const FieldLayout& f);
+
   static std::string format(const Value& v);
 };

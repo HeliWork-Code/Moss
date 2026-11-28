@@ -221,17 +221,18 @@ examples/                small programs
 
 ## Status and limitations
 
-Works today: `int`, `bool`, `string`, `void`, `const` bindings, structs
-(reference semantics, methods with implicit `self`),
-arrays with fixed, runtime or growable lengths plus bounds and capacity
-checks, `len`/`grow`/`shrink`, functions, `if`/`else`, `while`, `for`,
+Works today: `int`, `bool`, `string`, `void`, `const` bindings and constant
+arrays, structs (reference semantics, methods with implicit `self`, fields that
+hold arrays or other structs), arrays with fixed, runtime or growable lengths
+plus bounds and capacity checks, array literals and whole-array assignment,
+`len`/`grow`/`shrink`, functions, `if`/`else`, `while`, `for`,
 `for ... in` over ranges and arrays, `__go`, capabilities with `pick`,
 aliasing, overloads, `mut` parameters, `@` mentions, string concatenation
 and comparison, `ask`/`input`/`show` style I/O.
 
 Not yet: collections (lists, maps), first-class functions, enums and pattern
 matching, generics, struct literals, structs in modules, error handling,
-2D arrays.
+arrays of structs, 2D arrays.
 
 Generated C leaks strings (no deallocator yet); programs are meant to be
 short-lived.

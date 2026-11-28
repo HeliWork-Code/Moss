@@ -31,6 +31,7 @@ const char* tokName(Tok k) {
     case Tok::KwBoolType: return "bool";
     case Tok::KwStringType: return "string";
     case Tok::KwVoidType: return "void";
+    case Tok::KwNull: return "\\null";
     case Tok::At: return "@";
     case Tok::LParen: return "(";
     case Tok::RParen: return ")";
@@ -166,6 +167,19 @@ struct Lexer {
         Token t = make(Tok::IntLit, l, c);
         t.intVal = v;
         toks.push_back(t);
+        continue;
+      }
+
+      if (ch == '\\') {
+        adv();
+        std::string id;
+        while (!eof() && (std::isalnum((unsigned char)peek()) || peek() == '_')) {
+          id += peek();
+          adv();
+        }
+        if (id != "null")
+          throw LexError("expected 'null' after '\\'", l, c);
+        toks.push_back(make(Tok::KwNull, l, c));
         continue;
       }
 

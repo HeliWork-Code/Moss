@@ -154,11 +154,14 @@ class Loader {
       f->module = "core";
       core.caps.push_back(std::move(f));
     };
-    // len / grow / shrink, one overload set per element type.
-    auto arrCap = [&](const char* name, Type elem, NativeId id, bool withN) {
+    // len / grow / shrink, one overload set per element type. `grow` and
+    // `shrink` mutate the array object, so their parameter is `mut` and a
+    // constant array is rejected at the call site instead of at run time.
+    auto arrCap = [&](const char* name, Type elem, NativeId id, bool withN,
+                      bool arrMut) {
       auto f = std::make_unique<FuncDecl>();
       f->name = name;
-      f->params.push_back(Param{"a", Type::ofArray(elem), false});
+      f->params.push_back(Param{"a", Type::ofArray(elem), arrMut});
       if (withN) f->params.push_back(Param{"n", TypeKind::Int, false});
       f->returnType = id == NativeLen ? TypeKind::Int : TypeKind::Void;
       f->hasBody = false;
@@ -169,9 +172,9 @@ class Loader {
     };
     for (Type elem : {Type(TypeKind::Int), Type(TypeKind::Bool),
                       Type(TypeKind::Str)}) {
-      arrCap("len", elem, NativeLen, false);
-      arrCap("grow", elem, NativeGrow, true);
-      arrCap("shrink", elem, NativeShrink, true);
+      arrCap("len", elem, NativeLen, false, false);
+      arrCap("grow", elem, NativeGrow, true, true);
+      arrCap("shrink", elem, NativeShrink, true, true);
     }
 
     askCap(TypeKind::Int, false, NativeAskInt);
@@ -198,9 +201,6 @@ class Loader {
         throw LoadError("duplicate struct '" + sd->name + "'", sd->line);
       std::set<std::string> fieldNames;
       for (const StructField& f : sd->fields) {
-        if (f.type.isStruct())
-          throw LoadError("struct fields must be int, bool or string (for now)",
-                          f.line);
         if (!fieldNames.insert(f.name).second)
           throw LoadError("duplicate field '" + f.name + "' in struct '" +
                               sd->name + "'",

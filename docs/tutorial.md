@@ -127,6 +127,13 @@ array int fixed[10];      // exactly 10 elements
 array int growing[2~5];   // starts at 2, may grow to 5
 array int open[~];        // empty, no upper bound
 
+// A literal fills the array; the tail keeps the default value.
+array int squares[4] = {0, 1, 4, 9};
+const array int primes[3] = {2, 3, 5};   // read-only
+
+// A prefix rewrites only the leading elements.
+squares[2] = {7, 7};     // {7, 7, 4, 9}
+
 fixed[3] = 7;
 show @fixed[3];
 
@@ -176,7 +183,8 @@ fn int main() {
 ```
 
 Structs are references too: `q = p` makes both names point at the same
-object. Fields may currently be `int`, `bool` or `string`.
+object. Fields may be `int`, `bool`, `string`, another struct, or an array of
+`int`/`bool`/`string`; an array field starts empty and can be grown.
 
 ## 7. Building executables
 

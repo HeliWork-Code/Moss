@@ -207,6 +207,44 @@ class Parser {
     return cap;
   }
 
+  // Parses `T name[length] [= init], ...` declarators; the leading `array`
+  // keyword has already been consumed. A constant array must have an
+  // initializer.
+  std::vector<DeclItem> parseArrayItems(bool isConstDecl, bool requireInit) {
+    const Type elem = parseType();
+    std::vector<DeclItem> items;
+    for (;;) {
+      DeclItem d;
+      d.line = peek().line;
+      d.name = expect(Tok::Ident, "array name").text;
+      d.type = Type::ofArray(elem);
+      expect(Tok::LBracket, "'[' with the array length");
+      if (check(Tok::Tilde)) {
+        advance();
+        d.size = Expr::intLit(0, d.line);
+        d.growable = true;
+        if (!check(Tok::RBracket)) d.maxSize = parseExpr();
+      } else {
+        d.size = parseExpr();
+        if (match(Tok::Tilde)) {
+          d.growable = true;
+          if (!check(Tok::RBracket)) d.maxSize = parseExpr();
+        }
+      }
+      expect(Tok::RBracket, "']'");
+      d.isConst = isConstDecl;
+      if (requireInit) {
+        expect(Tok::Assign, "'=': constant arrays need an initializer");
+        d.init = parseExpr();
+      } else if (match(Tok::Assign)) {
+        d.init = parseExpr();
+      }
+      items.push_back(std::move(d));
+      if (!match(Tok::Comma)) break;
+    }
+    return items;
+  }
+
   StmtPtr parseStmt() {
     const Token& t = peek();
 
@@ -231,10 +269,26 @@ class Parser {
                           std::move(body), start.line);
     }
 
+    // __roll target = {...};   -- grow when possible, otherwise wrap around.
+    if (check(Tok::Ident) && peek().text == "__roll") {
+      const Token& start = advance();
+      ExprPtr target = parseExpr();
+      expect(Tok::Assign, "'=' after the __roll target");
+      ExprPtr value = parseExpr();
+      expect(Tok::Semi, "';'");
+      StmtPtr s = Stmt::assign(std::move(target), std::move(value), start.line);
+      s->roll = true;
+      return s;
+    }
+
     if (check(Tok::KwConst)) {
       advance();
-      if (check(Tok::KwArray))
-        error("const arrays are not implemented yet");
+      if (check(Tok::KwArray)) {
+        advance();
+        std::vector<DeclItem> items = parseArrayItems(true, true);
+        expect(Tok::Semi, "';'");
+        return Stmt::declStmt(std::move(items), t.line);
+      }
       Type ty = parseType();
       std::vector<DeclItem> items;
       for (;;) {
@@ -254,30 +308,7 @@ class Parser {
 
     if (check(Tok::KwArray)) {
       advance();
-      Type elem = parseType();
-      std::vector<DeclItem> items;
-      for (;;) {
-        DeclItem d;
-        d.line = t.line;
-        d.name = expect(Tok::Ident, "array name").text;
-        d.type = Type::ofArray(elem);
-        expect(Tok::LBracket, "'[' with the array length");
-        if (check(Tok::Tilde)) {
-          advance();
-          d.size = Expr::intLit(0, t.line);
-          d.growable = true;
-          if (!check(Tok::RBracket)) d.maxSize = parseExpr();
-        } else {
-          d.size = parseExpr();
-          if (match(Tok::Tilde)) {
-            d.growable = true;
-            if (!check(Tok::RBracket)) d.maxSize = parseExpr();
-          }
-        }
-        expect(Tok::RBracket, "']'");
-        items.push_back(std::move(d));
-        if (!match(Tok::Comma)) break;
-      }
+      std::vector<DeclItem> items = parseArrayItems(false, false);
       expect(Tok::Semi, "';'");
       return Stmt::declStmt(std::move(items), t.line);
     }
@@ -464,30 +495,11 @@ class Parser {
     const Token& t = peek();
     if (check(Tok::KwArray)) {
       advance();
-      Type elem = parseType();
-      std::vector<DeclItem> items;
-      for (;;) {
-        DeclItem d;
-        d.line = t.line;
-        d.name = expect(Tok::Ident, "array name").text;
-        d.type = Type::ofArray(elem);
-        expect(Tok::LBracket, "'[' with the array length");
-        if (check(Tok::Tilde)) {
-          advance();
-          d.size = Expr::intLit(0, t.line);
-          d.growable = true;
-          if (!check(Tok::RBracket)) d.maxSize = parseExpr();
-        } else {
-          d.size = parseExpr();
-          if (match(Tok::Tilde)) {
-            d.growable = true;
-            if (!check(Tok::RBracket)) d.maxSize = parseExpr();
-          }
-        }
-        expect(Tok::RBracket, "']'");
-        items.push_back(std::move(d));
-        if (!match(Tok::Comma)) break;
-      }
+      std::vector<DeclItem> items = parseArrayItems(false, false);
+      // An initializer list cannot be lowered inside a for clause.
+      for (const DeclItem& d : items)
+        if (d.init)
+          error("an array cannot be initialized in a for-init clause");
       return Stmt::declStmt(std::move(items), t.line);
     }
     if (check(Tok::KwIntType) || check(Tok::KwBoolType) ||
@@ -575,6 +587,18 @@ class Parser {
     if (match(Tok::KwTrue)) return Expr::boolLit(true, t.line);
     if (match(Tok::KwFalse)) return Expr::boolLit(false, t.line);
     if (match(Tok::StrLit)) return Expr::strLit(t.text, t.line);
+    if (match(Tok::KwNull)) return Expr::nullLit(t.line);
+    if (match(Tok::LBrace)) {
+      std::vector<ExprPtr> elems;
+      if (!check(Tok::RBrace)) {
+        for (;;) {
+          elems.push_back(parseExpr());
+          if (!match(Tok::Comma)) break;
+        }
+      }
+      expect(Tok::RBrace, "'}' closing the array literal");
+      return parsePostfix(Expr::arrayLit(std::move(elems), t.line));
+    }
     if (match(Tok::LParen)) {
       ExprPtr e = parseExpr();
       expect(Tok::RParen, "')'");

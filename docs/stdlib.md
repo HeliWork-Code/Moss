@@ -45,8 +45,12 @@ The prompt is printed without a newline.
 | `len(array int a): int` | number of elements |
 | `len(array bool a): int` | |
 | `len(array string a): int` | |
-| `grow(array T a, int n): void` | adds `n` elements (default values) |
-| `shrink(array T a, int n): void` | removes `n` elements from the end |
+| `grow(mut array T a, int n): void` | adds `n` elements (default values) |
+| `shrink(mut array T a, int n): void` | removes `n` elements from the end |
+
+`grow` and `shrink` take their array as a `mut` parameter, so the argument must
+be a writable place: a variable, a struct field or an array element. A `const`
+array is rejected at compile time.
 
 `grow` fails at runtime when the array declares a maximum length and the new
 length would exceed it. Both fail on negative counts, and `shrink` cannot go

@@ -1,5 +1,6 @@
 #include "c_backend.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <map>
 #include <sstream>
@@ -31,10 +32,8 @@ std::string zeroValue(Type t) {
     case TypeKind::Int: return "0";
     case TypeKind::Bool: return "false";
     case TypeKind::Str: return "moss_str_make(\"\", 0)";
-    case TypeKind::Struct:
-      return "((S_" + t.sname + "*)calloc(1, sizeof(S_" + t.sname + ")))";
-    case TypeKind::Array:
-      return arrayBase(t) + "_new(0, 0)";
+    case TypeKind::Struct: return "moss_new_" + t.sname + "()";
+    case TypeKind::Array: return arrayBase(t) + "_new(0, -1)";
     default: return "0";
   }
 }
@@ -85,6 +84,11 @@ class CEmitter {
 
     out << kRuntimePrelude << "\n";
 
+    // Forward declarations first: a struct may hold another struct.
+    for (const auto& sd : prog.structs)
+      out << "typedef struct S_" << sd->name << " S_" << sd->name << ";\n";
+    out << "\n";
+
     for (const auto& sd : prog.structs) {
       out << "typedef struct S_" << sd->name << " {";
       for (const StructField& f : sd->fields)
@@ -92,6 +96,12 @@ class CEmitter {
       out << " } S_" << sd->name << ";\n";
     }
     out << "\n";
+
+    for (const auto& sd : prog.structs)
+      out << "static S_" << sd->name << "* moss_new_" << sd->name
+          << "(void);\n";
+    out << "\n";
+    for (const auto& sd : prog.structs) emitCtor(*sd);
 
     for (const FuncDecl* f : prog.bodies)
       out << "static " << signature(*f) << ";\n";
@@ -107,6 +117,25 @@ class CEmitter {
   std::map<const FuncDecl*, std::string> names;
   int indentLevel = 0;
   int tmpCounter = 0;
+
+  // A fresh instance: every int/bool/string field zeroed, every struct field
+  // a fresh object, every array field a fresh empty array. This mirrors what
+  // the VM's NewObj does, so both backends behave the same.
+  void emitCtor(const StructDecl& sd) {
+    out << "static S_" << sd.name << "* moss_new_" << sd.name << "(void) {\n";
+    out << "  S_" << sd.name << "* p = (S_" << sd.name
+        << "*)calloc(1, sizeof(S_" << sd.name << "));\n";
+    out << "  if (!p) moss_panic(\"out of memory\");\n";
+    for (const StructField& f : sd.fields)
+      out << "  p->f_" << f.name << " = " << fieldDefault(f.type) << ";\n";
+    out << "  return p;\n}\n\n";
+  }
+
+  static std::string fieldDefault(Type t) {
+    if (t.kind == TypeKind::Struct) return "moss_new_" + t.sname + "()";
+    if (t.kind == TypeKind::Array) return arrayBase(t) + "_new(0, -1)";
+    return zeroValue(t);
+  }
 
   void pad() {
     for (int i = 0; i < indentLevel; ++i) out << "  ";
@@ -174,6 +203,16 @@ class CEmitter {
         std::string res;
         for (const DeclItem& d : s.decls) {
           if (!res.empty()) res += ", ";
+          if (d.size) {  // a for-init declaration still needs its length
+            std::string base = arrayBase(d.type);
+            std::string maxExpr = d.growable
+                                      ? (d.maxSize ? expr(*d.maxSize)
+                                                   : std::string("-1"))
+                                      : expr(*d.size);
+            res += base + "* " + cvar(d.name) + " = " + base + "_new(" +
+                   expr(*d.size) + ", " + maxExpr + ")";
+            continue;
+          }
           res += ctype(d.type) + " " + cvar(d.name) + " = ";
           res += d.init ? expr(*d.init) : zeroValue(d.type);
         }
@@ -188,12 +227,138 @@ class CEmitter {
     }
   }
 
+  // An array declaration with an initializer: allocate, then store each
+  // element. The constructor zeroes the remaining slots.
+  void emitArrayInit(const DeclItem& d) {
+    std::string base = arrayBase(d.type);
+    long long cap = d.growable ? (d.maxSize ? d.maxSize->intVal : -1)
+                               : d.size->intVal;
+    long long k = (long long)d.init->args.size();
+    long long len = d.growable ? std::max(d.size->intVal, k) : d.size->intVal;
+    out << base << "* " << cvar(d.name) << " = " << base << "_new(" << len
+        << ", " << cap << ");\n";
+    for (long long i = 0; i < k; ++i) {
+      const Expr& e = *d.init->args[(size_t)i];
+      if (e.kind == Expr::Kind::NullLit) continue;
+      pad();
+      out << "moss_set_" << arraySuffix(d.type) << "(" << cvar(d.name)
+          << ", INT64_C(" << i << "), " << expr(e) << ");\n";
+    }
+  }
+
+  static std::string arrBase(Type elem) { return arrayBase(Type::ofArray(elem)); }
+  static std::string arrSuffix(Type elem) {
+    return arraySuffix(Type::ofArray(elem));
+  }
+
+  // `__roll`: value j goes to slot `pos`, then pos advances modulo len.
+  void emitRollWrite(const std::string& name, long long count, const Expr& lit,
+                     Type elem) {
+    const std::string v = cvar(name);
+    const std::string base = arrBase(elem);
+    const std::string set = "moss_set_" + arrSuffix(elem);
+    std::string pos = "v_pos" + std::to_string(++tmpCounter);
+    out << "{\n";
+    ++indentLevel;
+    pad();
+    out << "int64_t " << pos << " = 0;\n";
+    for (long long j = 0; j < count; ++j) {
+      const Expr& e = *lit.args[(size_t)j];
+      if (e.kind != Expr::Kind::NullLit) {
+        pad();
+        out << set << "(" << v << ", " << pos << ", " << expr(e) << ");\n";
+      }
+      if (j + 1 < count) {
+        pad();
+        out << pos << " = (" << pos << " + 1) % " << base << "_len(" << v
+            << ");\n";
+      }
+    }
+    --indentLevel;
+    pad();
+    out << "}\n";
+  }
+
+  // `a = {...}`: grow to the literal's length, write it, zero the rest.
+  void emitWholeArrayAssign(const std::string& name, const Expr& lit, Type elem,
+                            long long cap, bool roll) {
+    const std::string v = cvar(name);
+    const std::string base = arrBase(elem);
+    const std::string set = "moss_set_" + arrSuffix(elem);
+    long long k = (long long)lit.args.size();
+    if (roll && cap >= 0 && k > cap) {  // cannot grow that far: wrap instead
+      emitRollWrite(name, k, lit, elem);
+      return;
+    }
+    std::string i = "v_fill" + std::to_string(++tmpCounter);
+    out << "{\n";
+    ++indentLevel;
+    if (k > 0) {
+      pad();
+      out << "if (" << base << "_len(" << v << ") < INT64_C(" << k << ")) "
+          << base << "_grow(" << v << ", INT64_C(" << k << ") - " << base
+          << "_len(" << v << "));\n";
+    }
+    for (long long j = 0; j < k; ++j) {
+      const Expr& e = *lit.args[(size_t)j];
+      if (e.kind == Expr::Kind::NullLit) continue;
+      pad();
+      out << set << "(" << v << ", INT64_C(" << j << "), " << expr(e) << ");\n";
+    }
+    pad();
+    out << "for (int64_t " << i << " = INT64_C(" << k << "); " << i << " < "
+        << base << "_len(" << v << "); ++" << i << ") " << set << "(" << v
+        << ", " << i << ", " << zeroValue(elem) << ");\n";
+    --indentLevel;
+    pad();
+    out << "}\n";
+  }
+
+  // `a[X] = {...}`: grow to X, then write the first X positions.
+  void emitPrefixWrite(const std::string& name, long long x, const Expr& lit,
+                       Type elem, long long cap, bool roll) {
+    const std::string v = cvar(name);
+    const std::string base = arrBase(elem);
+    const std::string set = "moss_set_" + arrSuffix(elem);
+    long long k = (long long)lit.args.size();
+    if (roll && cap >= 0 && x > cap) {  // cannot grow that far: wrap instead
+      emitRollWrite(name, x, lit, elem);
+      return;
+    }
+    out << "{\n";
+    ++indentLevel;
+    if (x > 0) {
+      pad();
+      out << "if (" << base << "_len(" << v << ") < INT64_C(" << x << ")) "
+          << base << "_grow(" << v << ", INT64_C(" << x << ") - " << base
+          << "_len(" << v << "));\n";
+    }
+    for (long long j = 0; j < x; ++j) {
+      pad();
+      if (j < k) {
+        const Expr& e = *lit.args[(size_t)j];
+        if (e.kind == Expr::Kind::NullLit) continue;
+        out << set << "(" << v << ", INT64_C(" << j << "), " << expr(e) << ");\n";
+      } else {
+        out << set << "(" << v << ", INT64_C(" << j << "), " << zeroValue(elem)
+            << ");\n";
+      }
+    }
+    --indentLevel;
+    pad();
+    out << "}\n";
+  }
+
   void stmt(const Stmt& s) {
     switch (s.kind) {
       case Stmt::Kind::Decl:
         for (const DeclItem& d : s.decls) {
           pad();
           if (d.size) {
+            if (d.init) {
+              emitArrayInit(d);
+              continue;
+            }
             std::string base = arrayBase(d.type);
             std::string maxExpr =
                 d.growable
@@ -212,6 +377,18 @@ class CEmitter {
 
       case Stmt::Kind::Assign:
         pad();
+        if (s.expr->kind == Expr::Kind::ArrayLit) {
+          if (s.target->kind == Expr::Kind::Var) {
+            emitWholeArrayAssign(s.target->name, *s.expr, *s.target->type.elem,
+                                 s.target->arrCap, s.roll);
+          } else {
+            const Expr& base = unwrap(*s.target->lhs);
+            emitPrefixWrite(base.name, s.target->rhs->intVal, *s.expr,
+                            *s.target->lhs->type.elem, s.target->lhs->arrCap,
+                            s.roll);
+          }
+          break;
+        }
         if (s.target->kind == Expr::Kind::Index) {
           out << "moss_set_" << arraySuffix(s.target->lhs->type) << "("
               << expr(*s.target->lhs) << ", " << expr(*s.target->rhs) << ", "
@@ -393,6 +570,13 @@ class CEmitter {
       case Expr::Kind::Index:
         return "moss_at_" + arraySuffix(e.lhs->type) + "(" + expr(*e.lhs) +
                ", " + expr(*e.rhs) + ")";
+      case Expr::Kind::ArrayLit:
+        // Only reachable through a declaration initializer, which emits the
+        // stores itself; the type checker rejects literals anywhere else.
+        return "0";
+      case Expr::Kind::NullLit:
+        // Same: `\null` is only meaningful inside a literal.
+        return "0";
     }
     return "0";
   }

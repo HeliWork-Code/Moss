@@ -7,12 +7,16 @@ namespace {
 struct VarInfo {
   Type type;
   bool mutable_ = true;
+  // For array variables: the declared maximum length, or -1 when unbounded or
+  // unknown (a parameter, or a non-constant declaration).
+  long long cap = -1;
 };
 
 class Checker {
  public:
   void run(const LoadedProgram& p) {
     prog = &p;
+    checkStructs(p);
     for (const FuncDecl* f : p.bodies) checkFunction(*f);
   }
 
@@ -40,11 +44,11 @@ class Checker {
   }
 
   void declare(int line, const std::string& name, Type type,
-               bool mutable_ = true) {
+               bool mutable_ = true, long long cap = -1) {
     auto& scope = scopes.back();
     if (scope.count(name))
       error(line, "variable '" + name + "' is already declared in this scope");
-    scope[name] = VarInfo{type, mutable_};
+    scope[name] = VarInfo{type, mutable_, cap};
   }
 
   const VarInfo* findVar(const std::string& name) const {
@@ -68,6 +72,133 @@ class Checker {
     TypeKind ek = t.elem ? t.elem->kind : TypeKind::Error;
     if (ek != TypeKind::Int && ek != TypeKind::Bool && ek != TypeKind::Str)
       error(line, "array elements must be int, bool or string");
+  }
+
+  // Checks an array literal against a known element type. `\null` entries are
+  // holes: they occupy a position but write nothing.
+  void checkLiteralElements(Expr& lit, const Type& elem) {
+    for (size_t i = 0; i < lit.args.size(); ++i) {
+      Expr& e = *lit.args[i];
+      if (e.kind == Expr::Kind::NullLit) continue;
+      if (e.kind == Expr::Kind::ArrayLit)
+        error(e.line, "arrays of arrays are not supported yet");
+      Type t = checkExpr(e);
+      if (t != elem)
+        error(e.line, "array literal element " + std::to_string(i + 1) +
+                          " has type " + typeName(t) + ", expected " +
+                          typeName(elem));
+    }
+    lit.type = Type::ofArray(elem);
+  }
+
+  void checkArrayInitializer(const DeclItem& d) {
+    if (d.init->kind != Expr::Kind::ArrayLit)
+      error(d.line, "an array can only be initialized with an array literal");
+    // The length rules need compile-time constants.
+    if (d.size->kind != Expr::Kind::IntLit)
+      error(d.line, "an array literal requires a constant length");
+    if (d.maxSize && d.maxSize->kind != Expr::Kind::IntLit)
+      error(d.line, "an array literal requires a constant capacity");
+    long long hi = d.growable ? (d.maxSize ? d.maxSize->intVal : -1)
+                              : d.size->intVal;
+    long long k = (long long)d.init->args.size();
+    if (hi >= 0 && k > hi)
+      error(d.line, "array literal has " + std::to_string(k) +
+                        " element(s) but '" + d.name + "' can hold at most " +
+                        std::to_string(hi));
+    checkLiteralElements(*d.init, *d.type.elem);
+    d.init->type = d.type;
+  }
+
+  // `a = {...}` and `a[X] = {...}`.
+  void checkArrayAssign(const Stmt& s) {
+    Expr& rhs = *s.expr;
+    if (s.target->kind == Expr::Kind::Var) {
+      const VarInfo& v = lookup(s.line, s.target->name);
+      if (!v.mutable_)
+        error(s.line, "cannot assign to constant '" + s.target->name + "'");
+      if (!v.type.isArray())
+        error(s.line, "array literal assigned to '" + s.target->name +
+                          "', which is not an array");
+      s.target->type = v.type;
+      s.target->arrCap = v.cap;
+      checkLiteralElements(rhs, *v.type.elem);
+      return;
+    }
+    if (s.target->kind == Expr::Kind::Index) {
+      Expr& base = *s.target->lhs;
+      if (base.kind != Expr::Kind::Var)
+        error(s.line, "a prefix assignment needs a plain array variable for now");
+      const VarInfo& v = lookup(s.line, base.name);
+      if (!v.mutable_)
+        error(s.line, "cannot assign to constant '" + base.name + "'");
+      if (!v.type.isArray())
+        error(s.line, std::string("'[]' requires an array, got ") +
+                          typeName(v.type));
+      base.type = v.type;
+      base.arrCap = v.cap;
+      Type idx = requireValue(checkExpr(*s.target->rhs), s.line);
+      if (idx != TypeKind::Int)
+        error(s.line, std::string("array index must be int, not ") +
+                          typeName(idx));
+      if (s.target->rhs->kind != Expr::Kind::IntLit)
+        error(s.line, "the prefix length must be a constant for now");
+      long long x = s.target->rhs->intVal;
+      long long k = (long long)rhs.args.size();
+      if (s.roll && k != x)
+        error(s.line, "array literal has " + std::to_string(k) +
+                          " element(s) but the prefix is " + std::to_string(x) +
+                          " (__roll needs exactly " + std::to_string(x) + ")");
+      if (k > x)
+        error(s.line, "array literal has " + std::to_string(k) +
+                          " element(s) but the prefix is " + std::to_string(x));
+      checkLiteralElements(rhs, *v.type.elem);
+      return;
+    }
+    error(s.line,
+          "an array literal can only be assigned to an array variable or a prefix");
+  }
+
+  // Struct fields may hold int, bool, string, another struct, or an array of
+  // int/bool/string. A struct that contains itself would make the default
+  // value infinite, so those cycles are rejected up front.
+  void checkStructs(const LoadedProgram& p) {
+    for (const auto& sd : p.structs) {
+      for (const StructField& f : sd->fields) {
+        if (f.type.kind == TypeKind::Void)
+          error(f.line, "struct field '" + f.name + "' cannot be void");
+        if (f.type.kind == TypeKind::Array) {
+          TypeKind ek = f.type.elem ? f.type.elem->kind : TypeKind::Error;
+          if (ek != TypeKind::Int && ek != TypeKind::Bool &&
+              ek != TypeKind::Str)
+            error(f.line, "array field '" + f.name +
+                              "' must hold int, bool or string");
+        }
+        if (f.type.kind == TypeKind::Struct &&
+            !p.structMap.count(f.type.sname))
+          error(f.line, "unknown struct '" + f.type.sname + "'");
+      }
+    }
+    std::unordered_map<std::string, int> state;  // 1 visiting, 2 done
+    for (const auto& sd : p.structs) visitStruct(*sd, state);
+  }
+
+  void visitStruct(const StructDecl& sd,
+                   std::unordered_map<std::string, int>& state) {
+    int& st = state[sd.name];
+    if (st == 2) return;
+    st = 1;
+    for (const StructField& f : sd.fields) {
+      if (f.type.kind != TypeKind::Struct) continue;
+      auto it = prog->structMap.find(f.type.sname);
+      if (it == prog->structMap.end()) continue;  // reported already
+      int& next = state[it->second->name];
+      if (next == 1)
+        error(f.line, "struct '" + sd.name +
+                          "' contains itself through field '" + f.name + "'");
+      if (next == 0) visitStruct(*it->second, state);
+    }
+    st = 2;
   }
 
   void checkFunction(const FuncDecl& f) {
@@ -120,9 +251,9 @@ class Checker {
                 error(d.line, "array capacity must be int, not " +
                                   std::string(typeName(mt)));
             }
-            if (d.init) error(d.line, "arrays cannot have an initializer yet");
+            if (d.init) checkArrayInitializer(d);
           }
-          if (d.init) {
+          if (d.init && !d.size) {
             Type t = checkExpr(*d.init);
             if (t == TypeKind::Void)
               error(d.line, "cannot initialize a variable with a void expression");
@@ -131,17 +262,42 @@ class Checker {
                                 "' is declared as " + typeName(d.type) +
                                 " but initialized with " + typeName(t));
           }
-          declare(d.line, d.name, d.type, !d.isConst);
+          long long cap = -1;
+          if (d.size && d.size->kind == Expr::Kind::IntLit) {
+            if (!d.growable) {
+              cap = d.size->intVal;
+            } else if (d.maxSize && d.maxSize->kind == Expr::Kind::IntLit) {
+              cap = d.maxSize->intVal;
+            }
+          }
+          declare(d.line, d.name, d.type, !d.isConst, cap);
         }
         break;
 
       case Stmt::Kind::Assign: {
+        if (s.expr->kind == Expr::Kind::ArrayLit) {
+          checkArrayAssign(s);
+          break;
+        }
+        if (s.roll)
+          error(s.line, "'__roll' needs an array literal on the right");
         Type targetType = checkLValue(*s.target);
         if (s.target->kind == Expr::Kind::Var) {
           const VarInfo& v = lookup(s.line, s.target->name);
           if (!v.mutable_)
             error(s.line,
                   "cannot assign to constant '" + s.target->name + "'");
+        } else if (s.target->kind == Expr::Kind::Index) {
+          // Writing through a constant array's elements is a write to the
+          // constant, since arrays are references.
+          const Expr* base = s.target->lhs.get();
+          while (base->kind == Expr::Kind::Mention) base = base->lhs.get();
+          if (base->kind == Expr::Kind::Var) {
+            const VarInfo& v = lookup(s.line, base->name);
+            if (!v.mutable_)
+              error(s.line, "cannot assign to an element of constant array '" +
+                                base->name + "'");
+          }
         }
         Type t = checkExpr(*s.expr);
         if (t == TypeKind::Void) error(s.line, "cannot assign a void expression");
@@ -264,7 +420,17 @@ class Checker {
       case Expr::Kind::IntLit: t = TypeKind::Int; break;
       case Expr::Kind::BoolLit: t = TypeKind::Bool; break;
       case Expr::Kind::StrLit: t = TypeKind::Str; break;
+
+      // Array literals are only accepted by checkArrayInitializer for now;
+      // anywhere else there is no expected element type to check against.
+      case Expr::Kind::ArrayLit:
+        error(e.line,
+              "array literals are only supported as array initializers yet");
+
       case Expr::Kind::Var: t = checkVar(e); break;
+
+      case Expr::Kind::NullLit:
+        error(e.line, "'\\null' may only appear inside an array literal");
 
       case Expr::Kind::Unary: {
         Type a = requireValue(checkExpr(*e.lhs), e.line);
@@ -385,7 +551,10 @@ class Checker {
 
   // A bare name inside a method may refer to a field of the receiver.
   Type checkVar(Expr& e) {
-    if (const VarInfo* v = findVar(e.name)) return v->type;
+    if (const VarInfo* v = findVar(e.name)) {
+      e.arrCap = v->cap;
+      return v->type;
+    }
     if (!currentStruct.empty()) {
       auto sit = prog->structMap.find(currentStruct);
       if (sit != prog->structMap.end())
@@ -481,9 +650,16 @@ class Checker {
     for (size_t i = 0; i < f->params.size(); ++i) {
       const Expr* arg = e.args[i].get();
       while (arg->kind == Expr::Kind::Mention) arg = arg->lhs.get();
-      if (f->params[i].mut && arg->kind != Expr::Kind::Var)
+      // A `mut` parameter may take any place that can be written: a variable,
+      // a field or an element. That is what lets `grow @b.data 3` work on a
+      // struct field holding an array.
+      const bool place = arg->kind == Expr::Kind::Var ||
+                         arg->kind == Expr::Kind::Member ||
+                         arg->kind == Expr::Kind::Index;
+      if (f->params[i].mut && !place)
         error(e.line, "argument " + std::to_string(i + 1) + " of '" + e.name +
-                          "' must be a variable (the parameter is 'mut')");
+                          "' must be a variable, a field or an element (the "
+                          "parameter is 'mut')");
       if (f->params[i].mut && arg->kind == Expr::Kind::Var) {
         const VarInfo* v = findVar(arg->name);
         if (v && !v->mutable_)

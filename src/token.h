@@ -7,6 +7,7 @@ enum class Tok {
   KwConst,
   KwIf, KwElse, KwWhile, KwFor, KwWhen, KwIn, KwReturn, KwTrue, KwFalse,
   KwIntType, KwBoolType, KwStringType, KwVoidType,
+  KwNull,
   At,
   LParen, RParen, LBrace, RBrace, Comma, Semi, Colon, Dot,
   Assign, Eq, Ne, Lt, Le, Gt, Ge, AmpAmp, PipePipe, Bang, Tilde,

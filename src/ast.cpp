@@ -40,6 +40,17 @@ ExprPtr Expr::strLit(const std::string& s, int line) {
   e->line = line;
   return e;
 }
+ExprPtr Expr::arrayLit(std::vector<ExprPtr> elems, int line) {
+  ExprPtr e(new Expr(Kind::ArrayLit));
+  e->args = std::move(elems);
+  e->line = line;
+  return e;
+}
+ExprPtr Expr::nullLit(int line) {
+  ExprPtr e(new Expr(Kind::NullLit));
+  e->line = line;
+  return e;
+}
 ExprPtr Expr::var(const std::string& name, int line) {
   ExprPtr e(new Expr(Kind::Var));
   e->name = name;
@@ -193,6 +204,11 @@ void dumpExpr(const Expr& e, int ind) {
       std::printf("Bool %s\n", e.boolVal ? "true" : "false");
       break;
     case Expr::Kind::StrLit: std::printf("Str \"%s\"\n", e.strVal.c_str()); break;
+    case Expr::Kind::ArrayLit:
+      std::printf("ArrayLit (%zu elements)\n", e.args.size());
+      for (const auto& a : e.args) dumpExpr(*a, ind + 1);
+      break;
+    case Expr::Kind::NullLit: std::printf("NullLit\n"); break;
     case Expr::Kind::Var: std::printf("Var %s\n", e.name.c_str()); break;
     case Expr::Kind::Unary:
       std::printf("Unary %s\n", e.op.c_str());
@@ -219,6 +235,11 @@ void dumpExpr(const Expr& e, int ind) {
       std::printf("Index\n");
       dumpExpr(*e.lhs, ind + 1);
       dumpExpr(*e.rhs, ind + 1);
+      break;
+    case Expr::Kind::MethodCall:
+      std::printf("MethodCall .%s\n", e.name.c_str());
+      dumpExpr(*e.lhs, ind + 1);
+      for (const auto& a : e.args) dumpExpr(*a, ind + 1);
       break;
   }
 }
@@ -272,6 +293,17 @@ void dumpStmt(const Stmt& s, int ind) {
       dumpExpr(*s.from, ind + 1);
       dumpExpr(*s.to, ind + 1);
       if (s.filter) dumpExpr(*s.filter, ind + 1);
+      dumpStmt(*s.body, ind + 1);
+      break;
+    case Stmt::Kind::ForEach:
+      std::printf("ForEach %s (%s)\n", s.varName.c_str(),
+                  s.isRange ? "range" : "array");
+      if (s.isRange) {
+        dumpExpr(*s.from, ind + 1);
+        dumpExpr(*s.to, ind + 1);
+      } else {
+        dumpExpr(*s.expr, ind + 1);
+      }
       dumpStmt(*s.body, ind + 1);
       break;
     case Stmt::Kind::Block:

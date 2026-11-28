@@ -30,6 +30,39 @@ std::string VM::format(const Value& v) {
   return "?";
 }
 
+Value VM::defaultField(const FieldLayout& f) {
+  switch (f.kind) {
+    case 1: return Value::bool_(false);
+    case 2: return Value::str("");
+    case 3: return newObject(f.extra);        // a fresh zeroed struct
+    case 4: return newArray(f.extra, -1, 0);  // a fresh empty array
+    default: return Value::int_(0);
+  }
+}
+
+Value VM::newObject(int structIndex) {
+  if (structIndex < 0 || (size_t)structIndex >= prog.structs.size())
+    throw RuntimeError("bad struct index");
+  const StructInfo& si = prog.structs[(size_t)structIndex];
+  std::vector<Value> fields;
+  fields.reserve(si.fields.size());
+  for (const FieldLayout& f : si.fields) fields.push_back(defaultField(f));
+  heap.push_back(std::move(fields));
+  return Value::obj((int64_t)heap.size() - 1);
+}
+
+Value VM::newArray(int elemTag, int64_t maxLen, int64_t n) {
+  if (n < 0) throw RuntimeError("negative array length");
+  if (maxLen >= 0 && n > maxLen)
+    throw RuntimeError("initial array length exceeds capacity");
+  ArrObj a;
+  a.maxLen = maxLen;
+  a.elemTag = elemTag;
+  a.elems.assign((size_t)n, defaultArrayValue(elemTag));
+  arrays.push_back(std::move(a));
+  return Value::arr((int64_t)arrays.size() - 1);
+}
+
 int VM::run() {
   stack.clear();
   heap.clear();
@@ -206,18 +239,7 @@ int VM::run() {
       }
 
       case Op::NewObj: {
-        if (in.operand < 0 || (size_t)in.operand >= prog.structs.size())
-          throw RuntimeError("bad struct index");
-        const StructInfo& si = prog.structs[(size_t)in.operand];
-        std::vector<Value> fields;
-        fields.reserve(si.fieldTypes.size());
-        for (uint8_t t : si.fieldTypes) {
-          if (t == 1) fields.push_back(Value::bool_(false));
-          else if (t == 2) fields.push_back(Value::str(""));
-          else fields.push_back(Value::int_(0));
-        }
-        heap.push_back(std::move(fields));
-        push(Value::obj((int64_t)heap.size() - 1));
+        push(newObject((int)in.operand));
         break;
       }
 
@@ -251,15 +273,7 @@ int VM::run() {
       case Op::NewArray: {
         int64_t maxLen = pop().i;
         int64_t n = pop().i;
-        if (n < 0) throw RuntimeError("negative array length");
-        if (maxLen >= 0 && n > maxLen)
-          throw RuntimeError("initial array length exceeds capacity");
-        ArrObj a;
-        a.maxLen = maxLen;
-        a.elemTag = (int)in.operand;
-        a.elems.assign((size_t)n, defaultArrayValue(a.elemTag));
-        arrays.push_back(std::move(a));
-        push(Value::arr((int64_t)arrays.size() - 1));
+        push(newArray((int)in.operand, maxLen, n));
         break;
       }
 

@@ -48,7 +48,9 @@ struct Reader {
 };
 
 constexpr uint32_t kMagic = 0x43424f4d;  // "MOBC"
-constexpr uint32_t kVersion = 2;
+// 3: struct fields carry a layout (kind + extra) instead of a single tag byte,
+//    so a struct can hold arrays and other structs.
+constexpr uint32_t kVersion = 3;
 
 }  // namespace
 
@@ -64,8 +66,11 @@ std::string serializeProgram(const BytecodeProgram& prog) {
   putU32(out, (uint32_t)prog.structs.size());
   for (const auto& st : prog.structs) {
     putStr(out, st.name);
-    putU32(out, (uint32_t)st.fieldTypes.size());
-    for (uint8_t t : st.fieldTypes) out.push_back((char)t);
+    putU32(out, (uint32_t)st.fields.size());
+    for (const FieldLayout& f : st.fields) {
+      out.push_back((char)f.kind);
+      putU32(out, (uint32_t)f.extra);
+    }
   }
 
   putU32(out, (uint32_t)prog.functions.size());
@@ -100,8 +105,12 @@ BytecodeProgram deserializeProgram(const std::string& data) {
     StructInfo st;
     st.name = r.str();
     uint32_t nf = r.u32();
-    r.need(nf);
-    for (uint32_t k = 0; k < nf; ++k) st.fieldTypes.push_back(r.u8());
+    for (uint32_t k = 0; k < nf; ++k) {
+      FieldLayout f;
+      f.kind = r.u8();
+      f.extra = (int32_t)r.u32();
+      st.fields.push_back(f);
+    }
     prog.structs.push_back(std::move(st));
   }
 

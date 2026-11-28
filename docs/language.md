@@ -33,7 +33,6 @@ compatibility checks.
 | `void` | only as a function result |
 | `Point`, `...` | a struct declared in this file |
 | `array T` | an array of `T`; `T` may be `int`, `bool` or `string` |
-
 There are no implicit conversions: `int` and `bool` never mix, and an `int`
 expression cannot be used as a condition.
 
@@ -47,7 +46,7 @@ const int n = 10;  // must be initialized; cannot be assigned
 
 - Defaults: `0`, `false`, `""`.
 - `const` bindings reject assignment, including through `mut` parameters.
-- Constant arrays are not implemented yet.
+- `const array` bindings are arrays; see [Arrays](#arrays).
 
 Array declarations carry a length, or a length range:
 
@@ -58,6 +57,58 @@ array int c[10~];    // starts at 10, unbounded
 array int d[~];      // starts empty, unbounded
 array int e[~10];    // starts empty, at most 10
 ```
+
+An array declaration may be initialized with a literal. The literal may be
+shorter than the declared length; the remaining elements keep their default.
+A literal longer than the capacity is a compile error, and the length and
+capacity must be constant when a literal is present.
+
+```moss
+array int a[5] = {1, 2, 3};    // {1, 2, 3, 0, 0}
+array int g[2~5] = {7, 8, 9};  // grows to length 3
+array int h[3~] = {1};         // length 3: {1, 0, 0}
+array int e[~10] = {};         // empty
+
+const array int digits[5] = {1, 2, 3};  // cannot be written afterwards
+```
+
+Assigning a literal to an array variable replaces its contents: the array
+grows when the literal is longer than the current length, and the tail is
+zero-filled when it is shorter.
+
+```moss
+array int a[5] = {1, 2, 3, 4, 5};
+a = {9, 8};          // {9, 8, 0, 0, 0}
+```
+
+A write can also be limited to the head of the array:
+
+```moss
+array int a[5] = {1, 2, 3, 4, 5};
+a[3] = {10, 20, 30};   // {10, 20, 30, 4, 5}
+a[3] = {1, \null, 3};  // slot 1 keeps whatever it held
+```
+
+- `X` is the number of leading positions written and must be a constant.
+- The literal may be shorter than `X`; the positions it does not reach are set
+  to the element default.
+- `\null` is a hole: that slot is skipped instead of written, and it still
+  counts as one of the `X` positions.
+- When `X` is greater than the current length, the array grows first if its
+  declaration allows it.
+
+`__roll` in front of such a write handles arrays that cannot grow: the values
+are written in a ring instead, at index `i % len`, and the length does not
+change.
+
+```moss
+array int a[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+__roll a[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0};
+// {9, 0, 3, 4, 5, 6, 7, 8}
+```
+
+`__roll` needs exactly `X` values. An unbounded array can always grow, so it
+never wraps there; a true carousel needs a bounded declaration.
 
 ## Expressions
 
@@ -97,6 +148,9 @@ for i in from~to stmt
 __go (from ~ to) [when (cond)] stmt
 return [expr];
 target = expr;                            // target: variable, field, element
+target = literal;                         // whole-array assignment
+target[X] = literal;                      // rewrite the first X elements
+__roll target[X] = literal;               // grow if possible, else wrap
 expr;
 ```
 
@@ -142,7 +196,10 @@ struct Point {
 ```
 
 - Structs are declared in the main file (not in `.msh` modules yet).
-- Fields may be `int`, `bool` or `string`.
+- Fields may be `int`, `bool`, `string`, another struct, or an array of
+  `int`/`bool`/`string`. An array field starts as a fresh empty array, which
+  `grow` can extend; a struct field starts as a fresh zeroed object.
+- A struct may not contain itself, directly or through other fields.
 - Methods are declared with `fn` inside the body. Their implicit first
   parameter is `self`; fields are directly visible inside a method.
 - Methods are resolved statically by receiver type and exact argument types.
@@ -157,6 +214,8 @@ struct Point {
   callee modify the caller's elements.
 - Elements are `int`, `bool` or `string`.
 - Every index is bounds-checked; out of range is a runtime error.
+- Array literals may initialize a declaration or replace a whole array.
+- `const` arrays reject assignment, element writes and `grow`/`shrink`.
 - `len`, `grow` and `shrink` are capabilities provided by `core`.
 - Growing past the declared maximum is a runtime error.
 
@@ -239,7 +298,10 @@ param     := [ "mut" ] type ident
 block     := "{" statement* "}"
 statement := block
            | "const" type ident "=" expr ("," ident "=" expr)* ";"
-           | "array" type ident "[" [expr] ["~" [expr]] "]" ("," ...)* ";"
+           | "const" "array" type ident "[" length "]" "=" literal
+             ("," ident "[" length "]" "=" literal)* ";"
+           | "array" type ident "[" length "]" ["=" literal]
+             ("," ident "[" length "]" ["=" literal])* ";"
            | type ident ["=" expr] ("," ident ["=" expr])* ";"
            | "if" "(" expr ")" statement ["else" statement]
            | "while" "(" expr ")" statement
@@ -248,15 +310,29 @@ statement := block
            | "__go" "(" expr "~" expr ")" ["when" "(" expr ")"] statement
            | "return" [expr] ";"
            | lvalue "=" expr ";"
+           | lvalue "=" literal ";"
+           | lvalue "[" expr "]" "=" literal ";"
+           | "__roll" lvalue "[" expr "]" "=" literal ";"
            | ident expr* ";"                 (* verb call *)
            | expr ";"
 expr      := binary expression with the precedence in the table above
 lvalue    := ident | lvalue "." ident | lvalue "[" expr "]"
+literal   := "{" [ elem ("," elem)* ] "}"
+elem      := expr | "\null"
+length    := [expr] ["~" [expr]]
 ```
 
 ## Current limitations
 
 - No collections other than arrays, no generics, no first-class functions,
   no enums or pattern matching, no error handling, no 2D arrays.
-- Structs and const arrays have restrictions listed above.
+- Arrays cannot hold structs yet, and arrays cannot hold arrays.
+- A prefix write (`a[X] = {...}`) and `__roll` need a constant `X`, and their
+  target must be a plain array variable.
+- Structs and `const` arrays have the restrictions listed above.
 - Generated C leaks strings; programs are meant to be short-lived.
+
+## Bytecode files
+
+`.mbc` files carry a format version. 26.0.3 writes version 3; files from
+26.0.2 and earlier are rejected with `unsupported bytecode version`.
