@@ -14,7 +14,7 @@ Versions are `[year].[major].[pre-release]`:
 - Pre-releases may change behaviour or syntax without notice; stable
   releases keep compatibility within their major version.
 
-## [26.0.3] — unreleased
+## [26.0.3] — 2026-11-28
 
 ### Added
 
@@ -54,7 +54,7 @@ Versions are `[year].[major].[pre-release]`:
   native backend; it used to be built empty there while the VM built it with
   the right length.
 
-## [26.0.2] — unreleased
+## [26.0.2] — 2026-11-27
 
 ### Added
 
