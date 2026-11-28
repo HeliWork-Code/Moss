@@ -5,14 +5,31 @@ All notable changes to Moss are documented here. The format follows
 
 ## Versioning
 
-Versions are `[year].[major].[pre-release]`:
+Releases are `<year>.<train>.<minor>[.<hotfix>][-<alpha|beta|rc>.<n>]`:
 
-- `26.0.1`, `26.0.2`, ... are pre-releases published in 2026 on the way to
-  the stable `26.1.0`.
-- `26.1.0` is the stable release of that line; the last number is `0` for
-  stable releases.
-- Pre-releases may change behaviour or syntax without notice; stable
-  releases keep compatibility within their major version.
+- `26` is the language standard — the year. Breaking syntax changes happen only
+  when the standard changes. From 2100 on the year uses four digits.
+- `train` counts major release trains, about two months each.
+- `minor` counts releases inside a train, one to two weeks each.
+- `hotfix` repairs an already released minor, and never adds a feature.
+- Pre-releases append `-alpha.N`, `-beta.N` or `-rc.N`.
+
+"Feature 1" is a release title, not part of the version; `26.1.2+feature.1` is
+the same release as `26.1.2`, written with build metadata.
+
+`26.0.0`–`26.0.3` used the previous `[year].[major].[pre-release]` numbering,
+and `26.0.3` was its last release. The full policy is in
+[docs/versioning.md](docs/versioning.md).
+
+## [26.1.0] — unreleased
+
+### Changed
+
+- Version numbering moves to `<year>.<train>.<minor>[.<hotfix>]`; `26.0.3` was
+  the last release of the old scheme. See [docs/versioning.md](docs/versioning.md).
+- The compiler stops owning what a library can own: user-defined types start
+  moving into modules, with fields that carry their own capacity range. See
+  [docs/openness.md](docs/openness.md).
 
 ## [26.0.3] — 2026-11-28
 

@@ -1,18 +1,21 @@
 # Language reference
 
-This document describes Moss 26.0.x. Moss is experimental; details may change
-between pre-releases.
+This document describes the 2026 standard of Moss. Moss is experimental;
+details may still change, but breaking changes only happen with a new standard.
 
 ## Source files
 
-A Moss program is one `.ms` file. The first statement may be a version line:
+A Moss program is one `.ms` file. The first statement declares the language
+standard it is written for:
 
 ```moss
-moss 1000;
+moss 2026;
 ```
 
-It is optional today and has no effect beyond being reserved for future
-compatibility checks.
+`moss 1000;` is accepted as an alias for the 2026 standard; it was the
+placeholder before standards existed. The declaration is optional while only
+one standard exists, but a compiler that supports several of them refuses one
+it does not implement.
 
 ## Lexical structure
 
