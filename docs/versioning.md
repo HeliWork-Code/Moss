@@ -8,40 +8,68 @@ A Moss release has four numeric fields and two optional decorations:
 
 | Field | Meaning | Rhythm |
 |---|---|---|
-| `year` | the language standard | two digits (`26`); four from 2100 on |
+| `year` | the release year | two digits (`26`); four from 2100 on |
 | `train` | major release train | about two months |
 | `minor` | minor release | one to two weeks |
 | `hotfix` | repairs on a released minor | the same day when urgent |
 | `stage` | pre-release qualifier | `alpha`, `beta`, `rc` |
 | `n` | pre-release number | `1`, `2`, ... |
 
+The compiler version says **when** a build was made. It says nothing about
+which language rules it implements; that is the standard, below.
+
 ## Examples
 
 | Version | Meaning |
 |---|---|
-| `26.1.0` | 2026 standard, train 1, first minor |
+| `26.1.0` | release year 2026, train 1, first minor |
 | `26.1.2` | 2026, train 1, third minor |
 | `26.1.2.1` | first hotfix for `26.1.2` |
 | `26.2.0-beta.3` | third beta of the next train |
-| `2100.1.0` | the first standard that needs four digits |
+| `2100.1.0` | the first release year that needs four digits |
 
 Sorting is plain numeric ordering per field, with `alpha < beta < rc < final`,
 so no tool needs a custom comparison rule.
 
-## The year is the language standard
+## The language standard
 
-- Breaking syntax changes are only allowed when the year changes.
-- A source file declares the standard it is written for: `moss 2026;`.
-  `moss 1000;` is accepted as an alias for the 2026 standard, because it was
-  the placeholder before standards existed.
-- A compiler supports the standards it was built with, and keeps supporting
-  older ones.
-- `.mbc` bytecode written under a standard stays readable by later compilers
-  that support that standard.
+The standard is versioned on its own, as `A.B.C`:
 
-Inside a year, everything is additive: new capabilities, new library types,
-new optimisations. A change that would break existing code waits for the next
-standard, and ships with `moss migrate` support.
+- **A** — breaking epoch. Syntax or semantics that old code relies on changes.
+- **B** — additions. New syntax, capabilities or guarantees; old code still
+  compiles.
+- **C** — clarifications and fixes with no intended semantic change.
+
+A source file declares the standard it is written for:
+
+```moss
+moss 1.0;
+```
+
+`moss 1000;` is accepted as an alias for standard `1.0`; it was the placeholder
+before standards existed. The declaration is optional while only one standard
+exists.
+
+The first standard is **1.0**, shipped by compiler `26.1.0`.
+
+## Which standards a compiler supports
+
+One compiler package ships several standards, but not every standard ever
+published:
+
+1. A compiler supports the current standard and the one before it.
+2. Older standards are frozen: they keep receiving bug fixes, never features.
+3. A retired standard can still be built with the compiler release of its era,
+   and `moss migrate` moves code forward.
+
+Standards are implemented as feature switches in the front end, not as copies
+of it. A standard that only adds syntax costs almost nothing to keep; a
+standard that changes the meaning of existing syntax costs a branch, which is
+why breaking epochs are rare by design.
+
+Within a standard, `.mbc` bytecode stays readable by later compilers that
+support that standard, and the capabilities of `core` and the standard library
+keep their signatures.
 
 ## Feature batches are labels
 

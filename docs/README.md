@@ -10,9 +10,10 @@
 | [Building Moss](../BUILDING.md) | you want to build the compiler or produce executables |
 | [Changelog](../CHANGELOG.md) | you want to know what changed between versions |
 
-Moss is experimental. The year in a release number is the language standard,
-and breaking syntax changes only happen when the standard changes. `26.0.x`
-used the previous numbering; `26.0.3` was its last release.
+Moss is experimental. Compiler releases carry the year; the language standard is
+versioned separately (`1.0` is the first), and breaking changes only happen with
+a new standard. `26.0.x` used the previous numbering; `26.0.3` was its last
+release.
 
 ## The two ideas behind Moss
 

@@ -7,10 +7,10 @@
 A small, statically typed language built around **capabilities**: nothing is
 built in except the ability to `pick` what you need.
 
-> Status: experimental. Releases are `<year>.<train>.<minor>`, where the year is
-> the language standard; `26.0.x` used the previous numbering and `26.0.3` was
-> its last release. See [versioning](docs/versioning.md) and
-> [CHANGELOG.md](CHANGELOG.md).
+> Status: experimental. Compiler releases are `<year>.<train>.<minor>`; the
+> language standard is versioned separately (`1.0` is the first). `26.0.x` used
+> the previous numbering and `26.0.3` was its last release. See
+> [versioning](docs/versioning.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ```
 moss 1000;

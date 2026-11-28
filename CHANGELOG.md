@@ -5,14 +5,18 @@ All notable changes to Moss are documented here. The format follows
 
 ## Versioning
 
-Releases are `<year>.<train>.<minor>[.<hotfix>][-<alpha|beta|rc>.<n>]`:
+Compiler releases are `<year>.<train>.<minor>[.<hotfix>][-<alpha|beta|rc>.<n>]`:
 
-- `26` is the language standard — the year. Breaking syntax changes happen only
-  when the standard changes. From 2100 on the year uses four digits.
+- `26` is the release year. From 2100 on the year uses four digits.
 - `train` counts major release trains, about two months each.
 - `minor` counts releases inside a train, one to two weeks each.
 - `hotfix` repairs an already released minor, and never adds a feature.
 - Pre-releases append `-alpha.N`, `-beta.N` or `-rc.N`.
+
+The language standard is versioned separately as `A.B.C` (`1.0` is the first):
+`A` changes on breaking syntax or semantics, `B` on additions, `C` on
+clarifications. A source file declares the standard it is written for with
+`moss 1.0;`. A compiler supports the current standard and the one before it.
 
 "Feature 1" is a release title, not part of the version; `26.1.2+feature.1` is
 the same release as `26.1.2`, written with build metadata.
@@ -25,8 +29,10 @@ and `26.0.3` was its last release. The full policy is in
 
 ### Changed
 
-- Version numbering moves to `<year>.<train>.<minor>[.<hotfix>]`; `26.0.3` was
-  the last release of the old scheme. See [docs/versioning.md](docs/versioning.md).
+- Version numbering moves to `<year>.<train>.<minor>[.<hotfix>]` with the
+  language standard tracked separately as `A.B.C` (this release ships standard
+  `1.0`); `26.0.3` was the last release of the old scheme. See
+  [docs/versioning.md](docs/versioning.md).
 - The compiler stops owning what a library can own: user-defined types start
   moving into modules, with fields that carry their own capacity range. See
   [docs/openness.md](docs/openness.md).
