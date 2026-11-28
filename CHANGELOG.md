@@ -16,7 +16,13 @@ Compiler releases are `<year>.<train>.<minor>[.<hotfix>][-<alpha|beta|rc>.<n>]`:
 The language standard is versioned separately as `A.B.C` (`1.0` is the first):
 `A` changes on breaking syntax or semantics, `B` on additions, `C` on
 clarifications. A source file declares the standard it is written for with
-`moss 1.0;`. A compiler supports the current standard and the one before it.
+`moss 1.0;`. A compiler supports the current standard, the one before it, and
+every LTS standard.
+
+An LTS is a **frozen standard**, not a maintenance branch: the mainline
+compiler keeps supporting it (so its users still get fixes), it never gains
+features, and it retires on its own schedule — possibly after standards
+published later have already retired.
 
 "Feature 1" is a release title, not part of the version; `26.1.2+feature.1` is
 the same release as `26.1.2`, written with build metadata.

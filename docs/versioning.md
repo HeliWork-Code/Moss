@@ -54,18 +54,43 @@ The first standard is **1.0**, shipped by compiler `26.1.0`.
 
 ## Which standards a compiler supports
 
-One compiler package ships several standards, but not every standard ever
-published:
+One compiler package ships the current standard, the one before it, and every
+LTS standard:
 
-1. A compiler supports the current standard and the one before it.
-2. Older standards are frozen: they keep receiving bug fixes, never features.
-3. A retired standard can still be built with the compiler release of its era,
-   and `moss migrate` moves code forward.
+| Standard | Status |
+|---|---|
+| `1.2` | current |
+| `1.1` | previous |
+| `1.0` | LTS, frozen |
 
-Standards are implemented as feature switches in the front end, not as copies
-of it. A standard that only adds syntax costs almost nothing to keep; a
-standard that changes the meaning of existing syntax costs a branch, which is
-why breaking epochs are rare by design.
+Standards are feature switches in the front end, not copies of it. A standard
+that only adds syntax costs almost nothing to keep; a standard that changes the
+meaning of existing syntax costs a branch, which is why breaking epochs are rare
+by design.
+
+## LTS: a frozen standard, not a maintenance branch
+
+An LTS is a standard that has been declared frozen. It is implemented by the
+same mainline compiler, so there is no maintenance branch and nothing to
+backport: a user installs the newest compiler and keeps writing `moss 1.0;`,
+and still receives every fix.
+
+- Freezing happens once, when a standard has proven itself; it is not a
+  calendar event and not every standard becomes one.
+- An LTS standard never gains features or syntax.
+- Fixes arrive through normal compiler releases. A fix that lives in shared
+  code is made once and benefits every supported standard.
+- An LTS standard retires on its own schedule — by default three years after it
+  was frozen — and may outlive standards published after it: `1.0` LTS can
+  still be supported while `1.1` and `1.2` are already retired.
+- Retirement is announced at least one release in advance.
+
+The cost of an LTS is a longer test matrix, not a second maintenance line: the
+frozen standard's test suite keeps running against every compiler release.
+
+A standard that is neither current, previous nor LTS is retired; it can still be
+built with the compiler release of its era, and `moss migrate` moves code
+forward.
 
 Within a standard, `.mbc` bytecode stays readable by later compilers that
 support that standard, and the capabilities of `core` and the standard library
